@@ -1,0 +1,6 @@
+{
+  "name": "Nota & Stok Otomatis",
+  "description": "Sistem pembuatan nota penjualan yang terintegrasi otomatis dengan laporan stok barang, pencatatan pembayaran DP, pelunasan, sisa piutang, dan log mutasi stok.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

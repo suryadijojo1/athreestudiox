@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@media print {
+  /* Hide scrollbars & page headers during print */
+  body, html {
+    background: white !important;
+    color: #000000 !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  /* Hide everything flagged print:hidden */
+  aside, footer, nav, .print\:hidden, [id="btn-logout-sidebar"] {
+    display: none !important;
+  }
+
+  /* Expand full receipt to utilize maximal printable area without grey cards */
+  #detail-modal-overlay, #report-print-modal-overlay {
+    background: transparent !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  #detail-modal-box, #report-print-modal-box {
+    background: white !important;
+    color: black !important;
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: static !important;
+  }
+
+  #printable-receipt-sheet, #printable-report-sheet {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Target formats */
+  .format-pos-80 {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 2mm !important;
+    font-size: 11px !important;
+  }
+
+  .format-pos-58 {
+    width: 58mm !important;
+    max-width: 58mm !important;
+    margin: 0 !important;
+    padding: 1mm !important;
+    font-size: 9px !important;
+  }
+
+  .format-pos-58 input, .format-pos-58 select {
+    font-size: 9px !important;
+  }
+
+  /* Thermal printer cut optimization */
+  .thermal-receipt {
+    page-break-inside: avoid;
+  }
+
+  /* Ensure text matches high contrast printer colors */
+  h1, h2, h3, h4, th, td, p, span, strong, ul, li {
+    color: #000000 !important;
+  }
+}
+
