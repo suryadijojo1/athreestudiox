@@ -76,3 +76,187 @@
   }
 }
 
+/* ==========================================================================
+   ATHREE STUDIO HIGH-FIDELITY DARK MODE OVERRIDES
+   ========================================================================== */
+
+@media screen {
+  /* Toggled via .dark class on <html> element */
+  html.dark,
+  .dark {
+    color-scheme: dark;
+  }
+
+  /* Core app page backgrounds */
+  .dark body,
+  .dark #app-root-wrapper,
+  .dark #app-workspace-main {
+    background-color: #0f172a !important; /* slate-900 */
+    color: #cbd5e1 !important; /* slate-300 */
+  }
+
+  /* White cards, panels, sidebars mapped to slate-800 */
+  .dark .bg-white,
+  .dark aside,
+  .dark #app-navigation-sidebar,
+  .dark #quick-deadline-card,
+  .dark #quick-stock-card,
+  .dark #high-fidelity-shop-logo-simulation {
+    background-color: #1e293b !important; /* slate-800 */
+    color: #f1f5f9 !important; /* slate-100 */
+  }
+
+  /* Form inputs, select options, copy textareas */
+  .dark input,
+  .dark select,
+  .dark textarea {
+    background-color: #0f172a !important; /* slate-900 */
+    color: #f8fafc !important; /* slate-50 */
+    border-color: #334155 !important; /* slate-700 */
+  }
+  
+  .dark input:focus,
+  .dark select:focus,
+  .dark textarea:focus {
+    border-color: #6366f1 !important; /* indigo-500 */
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+  }
+
+  /* Light indigo details mapped to slate-900 subtle */
+  .dark .bg-indigo-50\/70,
+  .dark .bg-indigo-50\/50,
+  .dark .bg-indigo-50\/30,
+  .dark .bg-indigo-50\/10,
+  .dark .bg-indigo-50,
+  .dark .bg-slate-50,
+  .dark .bg-slate-50\/50,
+  .dark .bg-slate-100,
+  .dark .bg-slate-150 {
+    background-color: #0f172a !important; /* slate-900 */
+    color: #cbd5e1 !important;
+  }
+
+  /* Subtitle text colors */
+  .dark .text-slate-800,
+  .dark .text-slate-900,
+  .dark .text-slate-850,
+  .dark .text-slate-700 {
+    color: #f8fafc !important; /* slate-50 */
+  }
+
+  .dark .text-slate-600,
+  .dark .text-slate-500,
+  .dark .text-indigo-700,
+  .dark .text-indigo-805,
+  .dark .text-slate-750 {
+    color: #cbd5e1 !important; /* slate-300 */
+  }
+
+  .dark .text-slate-400,
+  .dark .text-slate-450 {
+    color: #94a3b8 !important; /* slate-400 */
+  }
+
+  /* Secondary badge styles */
+  .dark .bg-indigo-100 {
+    background-color: #312e81 !important; /* indigo-900 */
+    color: #c7d2fe !important; /* indigo-200 */
+  }
+  
+  .dark .bg-emerald-100 {
+    background-color: #064e3b !important; /* emerald-900 */
+    color: #a7f3d0 !important; /* emerald-200 */
+  }
+
+  .dark .bg-rose-100 {
+    background-color: #4c0519 !important; /* rose-900 */
+    color: #fecdd3 !important; /* rose-200 */
+  }
+
+  .dark .bg-amber-100 {
+    background-color: #78350f !important; /* amber-900 */
+    color: #fde68a !important; /* amber-200 */
+  }
+
+  /* Border line overrides */
+  .dark .border-indigo-100,
+  .dark .border-indigo-50,
+  .dark .border-slate-200,
+  .dark .border-slate-100,
+  .dark .border-indigo-50\/50,
+  .dark .border-indigo-100\/80,
+  .dark .border-slate-200\/90 {
+    border-color: #334155 !important; /* slate-700 */
+  }
+
+  /* Lists / Table details */
+  .dark table {
+    background-color: #1e293b !important;
+  }
+  
+  .dark thead tr,
+  .dark thead th {
+    background-color: #0f172a !important;
+    color: #cbd5e1 !important;
+  }
+  
+  .dark tr {
+    background-color: transparent !important;
+    border-color: #334155 !important;
+  }
+  
+  .dark td {
+    color: #e2e8f0 !important;
+    border-color: #334155 !important;
+  }
+
+  /* Hover states for interactive lists and buttons */
+  .dark .hover\:bg-indigo-50\/60:hover,
+  .dark .hover\:bg-slate-100:hover,
+  .dark .hover\:bg-slate-50:hover,
+  .dark .hover\:bg-indigo-50\/30:hover,
+  .dark .hover\:bg-indigo-50\/20:hover {
+    background-color: #334155 !important; /* slate-700 hover */
+    color: #ffffff !important;
+  }
+
+  /* Modal views & overlays */
+  .dark .bg-slate-900\/40,
+  .dark .bg-slate-900\/60,
+  .dark .bg-black\/50 {
+    background-color: rgba(15, 23, 42, 0.7) !important;
+  }
+  
+  .dark #detail-modal-box,
+  .dark #report-print-modal-box {
+    background-color: #1e293b !important;
+    color: #f1f5f9 !important;
+    border-color: #334155 !important;
+  }
+
+  /* Recharts visualization accessibility */
+  .dark .recharts-cartesian-axis-tick text {
+    fill: #94a3b8 !important;
+  }
+  
+  .dark .recharts-legend-item-text {
+    color: #cbd5e1 !important;
+  }
+  
+  .dark .recharts-default-tooltip {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+  }
+
+  /* Special exceptions and prints */
+  .dark .shadow-sm {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  }
+  
+  .dark .shadow-md {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3) !important;
+  }
+}
+
+

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Product, Invoice, StockMovement } from './types';
+import { Product, Invoice, StockMovement, AuditLog } from './types';
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
@@ -77,7 +77,8 @@ export const INITIAL_INVOICES: Invoice[] = [
     status: 'DP',
     customStatusLabel: 'DP 50%',
     notes: 'Desain logo Garuda di dada kiri, nomor punggung putih.',
-    productionStatus: 'PROSES'
+    productionStatus: 'PROSES',
+    deadlineDate: '2026-06-25'
   },
   {
     id: 'inv-2',
@@ -103,7 +104,8 @@ export const INITIAL_INVOICES: Invoice[] = [
     status: 'LUNAS',
     customStatusLabel: 'LUNAS',
     notes: 'Jersey warna biru navy, nameset kuning emas.',
-    productionStatus: 'SIAP_DIAMBIL'
+    productionStatus: 'SIAP_DIAMBIL',
+    deadlineDate: '2026-06-20'
   }
 ];
 
@@ -181,3 +183,34 @@ export const INITIAL_MOVEMENTS: StockMovement[] = [
     reference: 'Nota #002'
   }
 ];
+
+export const INITIAL_AUDIT_LOGS: AuditLog[] = [
+  {
+    id: 'log-1',
+    timestamp: '2026-06-10T08:00:00.000Z',
+    user: 'OWNER',
+    actionType: 'ADD_PRODUCT',
+    module: 'STOK',
+    description: 'Buka sistem & inisialisasi master barang JRS-PRM-01, CLN-STD-02, BLA-SZ5-03, KSK-SPC-04.',
+    referenceNum: 'Inisialisasi Database'
+  },
+  {
+    id: 'log-2',
+    timestamp: '2026-06-15T10:30:00.000Z',
+    user: 'KASIR',
+    actionType: 'CREATE_INVOICE',
+    module: 'NOTA',
+    description: 'Membuat Nota Pembayaran Jersey Baru #001 untuk pelanggan Garuda FC (Budi) senilai Rp 3.000.000 (status DP 50%).',
+    referenceNum: '#001'
+  },
+  {
+    id: 'log-3',
+    timestamp: '2026-06-16T14:15:00.000Z',
+    user: 'OWNER',
+    actionType: 'CREATE_INVOICE',
+    module: 'NOTA',
+    description: 'Membuat Nota Pembayaran Jersey Baru #002 untuk pelanggan Angkasa Tim (Andi) senilai Rp 1.800.000 (status Lunas).',
+    referenceNum: '#002'
+  }
+];
+

@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { StockMovement } from '../types';
-import { RotateCcw, Search, BarChart3, HelpCircle, FileDown, ArrowUpRight, ArrowDownRight, RefreshCcw, Printer, X, AlertCircle, Phone, MapPin } from 'lucide-react';
+import { RotateCcw, Search, BarChart3, HelpCircle, FileDown, ArrowUpRight, ArrowDownRight, RefreshCcw, Printer, X, AlertCircle, Phone, MapPin, ChevronDown, ChevronUp, Check, Settings } from 'lucide-react';
 
 interface LaporanStokProps {
   movements: StockMovement[];
@@ -16,7 +16,30 @@ export default function LaporanStok({ movements, onClearLogs }: LaporanStokProps
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'SEMAU' | 'IN' | 'OUT' | 'INITIAL'>('SEMAU');
   const [showPrintModal, setShowPrintModal] = useState(false);
-  const [printFormat, setPrintFormat] = useState<'a4' | 'pos80' | 'pos58'>('a4');
+  const [printFormat, setPrintFormat] = useState<'a4' | 'pos80' | 'pos58'>(() => {
+    const saved = localStorage.getItem('athree-workshop-print-format');
+    return (saved as 'a4' | 'pos80' | 'pos58') || 'a4';
+  });
+
+  const [showPrintConfig, setShowPrintConfig] = useState(false);
+  const [selectedPrinter, setSelectedPrinter] = useState(() => {
+    return localStorage.getItem('athree-printer-tujuan') || 'EPSON8BDF43 (L655 Series)';
+  });
+  const [selectedPages, setSelectedPages] = useState('Semua');
+  const [selectedCopies, setSelectedCopies] = useState(1);
+  const [selectedLayout, setSelectedLayout] = useState<'potret' | 'lanskap'>(() => {
+    return (localStorage.getItem('athree-printer-layout') as 'potret' | 'lanskap') || 'potret';
+  });
+  const [selectedColor, setSelectedColor] = useState<'warna' | 'monokrom'>(() => {
+    return (localStorage.getItem('athree-printer-warna') as 'warna' | 'monokrom') || 'warna';
+  });
+  const [showOtherSettings, setShowOtherSettings] = useState(false);
+  const [isSimulatingPrint, setIsSimulatingPrint] = useState(false);
+
+  const handleSetPrintFormat = (format: 'a4' | 'pos80' | 'pos58') => {
+    setPrintFormat(format);
+    localStorage.setItem('athree-workshop-print-format', format);
+  };
 
   const formatDateLong = (dateStr: string) => {
     try {
@@ -309,7 +332,7 @@ export default function LaporanStok({ movements, onClearLogs }: LaporanStokProps
                   <select
                     id="report-select-print-layout"
                     value={printFormat}
-                    onChange={(e) => setPrintFormat(e.target.value as any)}
+                    onChange={(e) => handleSetPrintFormat(e.target.value as any)}
                     className="bg-transparent font-black text-indigo-600 focus:outline-none cursor-pointer border-none py-0 text-xs"
                   >
                     <option value="a4">📄 A4 / Standar</option>
@@ -318,14 +341,9 @@ export default function LaporanStok({ movements, onClearLogs }: LaporanStokProps
                   </select>
                 </div>
 
-                <button
-                  id="report-btn-print"
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold rounded-xl text-xs border-none cursor-pointer transition shadow-sm"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  Cetak Sekarang
-                </button>
+                <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-lg font-black uppercase tracking-wider">
+                  💡 Cetakan Di Bagian Bawah
+                </span>
 
                 <button
                   id="report-btn-close"
@@ -538,16 +556,242 @@ export default function LaporanStok({ movements, onClearLogs }: LaporanStokProps
               )}
             </div>
 
-            {/* Modal Bottom Controls (Hidden in print) */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 print:hidden cursor-pointer">
+            {/* Modal Bottom Controls with Print Options (Hidden in print) */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3 print:hidden">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+                <span>Printer:</span>
+                <span className="text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded font-extrabold text-[10px] uppercase">
+                  💾 {selectedPrinter.split(' ')[0]} ({printFormat.toUpperCase()})
+                </span>
+              </div>
+              
+              <div className="flex gap-2 w-full sm:w-auto justify-end">
+                <button
+                  id="report-btn-close-bottom"
+                  onClick={() => setShowPrintModal(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 active:scale-95 text-slate-700 rounded-xl text-xs font-black border-none cursor-pointer transition animate-none"
+                >
+                  Tutup Dialog
+                </button>
+                <button
+                  id="report-btn-print-bottom"
+                  onClick={() => setShowPrintConfig(true)}
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black rounded-xl text-xs cursor-pointer border-none transition shadow-lg shadow-indigo-600/20"
+                >
+                  <Printer className="w-4 h-4" />
+                  Cetak Nota / Pilih Printer
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* --- HIGH-FIDELITY STOCK REPORT PRINT SETTINGS DIALOG --- */}
+      {showPrintConfig && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[60] overflow-y-auto animate-fade-in print:hidden" id="stock-print-options-backdrop">
+          <div className="bg-[#2d2e30] border border-slate-750 rounded-2xl w-full max-w-md shadow-2xl relative overflow-hidden text-slate-200 font-sans">
+            
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-zinc-700 flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Printer className="w-4 h-4 text-sky-400" />
+                  Cetak Laporan Mutasi Stok
+                </h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Konfigurasi printer fisik gudang &amp; format slip</p>
+              </div>
+              <div className="text-[10px] font-black tracking-widest bg-zinc-800 text-sky-300 px-2 py-1 rounded border border-zinc-700">
+                {printFormat.toUpperCase()} SLIP
+              </div>
+            </div>
+
+            {/* Config Fields */}
+            <div className="p-5 space-y-4">
+              
+              {/* Destination printer select */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-300 block">Tujuan Printer</label>
+                <div className="relative">
+                  <select
+                    value={selectedPrinter}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedPrinter(val);
+                      localStorage.setItem('athree-printer-tujuan', val);
+                      
+                      if (val.includes('80mm')) {
+                        handleSetPrintFormat('pos80');
+                      } else if (val.includes('58mm')) {
+                        handleSetPrintFormat('pos58');
+                      }
+                    }}
+                    className="w-full bg-[#1e1f21] hover:bg-[#252628] border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white cursor-pointer font-bold transition focus:outline-none appearance-none"
+                  >
+                    <option value="EPSON8BDF43 (L655 Series)">🖨️ EPSON8BDF43 (L655 Series) - Inkjet</option>
+                    <option value="Canon Pixma iP2770 Series">🖨️ Canon Pixma iP2770 Series - Standar</option>
+                    <option value="HP DeskJet Ink Advantage 2700">🖨️ HP DeskJet Ink Advantage 2700</option>
+                    <option value="Thermal Receipt POS-80 (80mm)">📟 Thermal Receipt POS-80 (Printer Kasir)</option>
+                    <option value="Thermal Receipt POS-58 (58mm)">📟 Thermal Receipt POS-58 (Mini Thermal)</option>
+                    <option value="Microsoft Print to PDF">📄 Microsoft Print to PDF (Simpan Digital)</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Print type format */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-300 block">Jenis Laporan / Ukuran Kertas</label>
+                <div className="relative">
+                  <select
+                    value={printFormat}
+                    onChange={(e) => {
+                      const val = e.target.value as 'a4' | 'pos80' | 'pos58';
+                      handleSetPrintFormat(val);
+                    }}
+                    className="w-full bg-[#1e1f21] hover:bg-[#252628] border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white cursor-pointer font-bold transition focus:outline-none appearance-none"
+                  >
+                    <option value="a4">📄 Kertas Ukuran A4 (Laporan Detail)</option>
+                    <option value="pos80">📟 Printer thermal POS Roll 80mm</option>
+                    <option value="pos58">📟 Printer thermal POS Roll 58mm</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Pages & Copies */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-300 block">Halaman</label>
+                  <div className="relative">
+                    <select
+                      value={selectedPages}
+                      onChange={(e) => setSelectedPages(e.target.value)}
+                      className="w-full bg-[#1e1f21] border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none cursor-pointer font-bold appearance-none"
+                    >
+                      <option value="Semua">Semua</option>
+                      <option value="Halaman Terpilih">Halaman Terpilih</option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-300 block">Salinan (Copies)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={selectedCopies}
+                    onChange={(e) => setSelectedCopies(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full bg-[#1e1f21] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Layout and Color */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-300 block">Tata Letak</label>
+                  <div className="relative">
+                    <select
+                      value={selectedLayout}
+                      onChange={(e) => {
+                        const val = e.target.value as 'potret' | 'lanskap';
+                        setSelectedLayout(val);
+                        localStorage.setItem('athree-printer-layout', val);
+                      }}
+                      className="w-full bg-[#1e1f21] border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none cursor-pointer font-bold appearance-none"
+                    >
+                      <option value="potret">Potret (Portrait)</option>
+                      <option value="lanskap">Lanskap (Landscape)</option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-300 block">Warna</label>
+                  <div className="relative">
+                    <select
+                      value={selectedColor}
+                      onChange={(e) => {
+                        const val = e.target.value as 'warna' | 'monokrom';
+                        setSelectedColor(val);
+                        localStorage.setItem('athree-printer-warna', val);
+                      }}
+                      className="w-full bg-[#1e1f21] border border-zinc-700 rounded-xl px-2.5 py-2.5 text-xs text-white focus:outline-none cursor-pointer font-bold appearance-none"
+                    >
+                      <option value="warna">Warna</option>
+                      <option value="monokrom">B&amp;W (Hitam Putih)</option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Accordion other custom settings */}
+              <div className="border-t border-zinc-750 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowOtherSettings(!showOtherSettings)}
+                  className="w-full flex justify-between items-center text-xs font-bold text-zinc-400 hover:text-white bg-transparent border-none cursor-pointer outline-none"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Settings className="w-3.5 h-3.5 text-indigo-400" />
+                    Setelan Tambahan Gudang
+                  </span>
+                  {showOtherSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {showOtherSettings && (
+                  <div className="mt-3 p-3 bg-zinc-800/40 rounded-xl space-y-2 border border-zinc-750 text-[11px] text-zinc-400">
+                    <div>• Menyertakan kode SKU barcode item</div>
+                    <div>• Rentang logs filter: Terpilih/Aktif layar saat ini</div>
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Bottom Buttons */}
+            <div className="px-5 py-4 border-t border-zinc-700 bg-[#252628] flex justify-end gap-2.5">
               <button
-                id="report-btn-close-bottom"
-                onClick={() => setShowPrintModal(false)}
-                className="px-4 py-2 bg-slate-205 hover:bg-slate-300 active:scale-95 text-slate-705 rounded-xl text-xs font-black border-none cursor-pointer transition"
+                type="button"
+                onClick={() => setShowPrintConfig(false)}
+                className="px-4 py-2 bg-transparent hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white rounded-lg text-xs font-bold cursor-pointer transition active:scale-95"
               >
-                Tutup Dialog
+                Batal
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSimulatingPrint(true);
+                  setTimeout(() => {
+                    setIsSimulatingPrint(false);
+                    setShowPrintConfig(false);
+                    window.print();
+                  }, 800);
+                }}
+                disabled={isSimulatingPrint}
+                className="flex items-center gap-1.5 px-6 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-zinc-700 text-white font-extrabold rounded-lg text-xs cursor-pointer border-none transition active:scale-95 shadow-md"
+              >
+                {isSimulatingPrint ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                    Menghubungkan...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 text-white" />
+                    Cetak
+                  </>
+                )}
               </button>
             </div>
+
           </div>
         </div>
       )}

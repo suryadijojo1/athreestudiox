@@ -40,6 +40,36 @@ export interface Invoice {
   customStatusLabel?: string; // e.g., "DP 50%"
   notes?: string;
   productionStatus?: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL';
+  deadlineDate?: string; // YYYY-MM-DD
+  paymentMethodDP?: 'CASH' | 'TRANSFER';
+  paymentMethodSettlement?: 'CASH' | 'TRANSFER';
+  salesCode?: string; // Kode Sales
+}
+
+export interface CashierSession {
+  id: string;
+  openedAt: string; // ISO String
+  openedBy: 'OWNER' | 'KASIR';
+  openingBalance: number; // Modal awal
+  closedAt?: string; // ISO String
+  closedBy?: 'OWNER' | 'KASIR';
+  expectedCash: number; // calculated cash in drawer: openingBalance + cash_in
+  actualCash?: number; // actual money counted
+  notes?: string;
+  status: 'OPEN' | 'CLOSED';
+}
+
+export interface PaymentTransaction {
+  id: string;
+  invoiceId?: string;
+  invoiceNum?: string;
+  customerName?: string;
+  amount: number;
+  method: 'CASH' | 'TRANSFER';
+  type: 'DP' | 'PELUNASAN' | 'PENGELUARAN';
+  timestamp: string; // ISO string
+  cashier: 'OWNER' | 'KASIR';
+  notes?: string;
 }
 
 export interface StockMovement {
@@ -54,3 +84,14 @@ export interface StockMovement {
   date: string; // ISO String or Local date string
   reference: string; // e.g., "Nota #001" or "Restock Manual"
 }
+
+export interface AuditLog {
+  id: string;
+  timestamp: string; // ISO String
+  user: 'OWNER' | 'KASIR' | 'PRODUKSI';
+  actionType: 'CREATE_INVOICE' | 'UPDATE_INVOICE' | 'DELETE_INVOICE' | 'PAYMENT_SETTLEMENT' | 'ADD_PRODUCT' | 'UPDATE_PRODUCT' | 'DELETE_PRODUCT' | 'RESTOCK_PRODUCT' | 'BULK_IMPORT' | 'RESET_SYSTEM' | 'UPDATE_PASSWORDS';
+  module: 'NOTA' | 'STOK' | 'SISTEM';
+  description: string;
+  referenceNum?: string; // e.g., invoice number or product name
+}
+

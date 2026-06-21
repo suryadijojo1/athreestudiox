@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product, Invoice, InvoiceItem, StockMovement } from '../types';
-import { Plus, Trash, Save, ShoppingCart, User, Phone, FileText, Landmark, Calendar, Info } from 'lucide-react';
+import { Plus, Trash, Save, ShoppingCart, User, Phone, FileText, Landmark, Calendar, Info, Search, ChevronDown, X } from 'lucide-react';
 
 interface NotaFormProps {
   products: Product[];
@@ -19,6 +19,7 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
   // Customer details
   const [customerName, setCustomerName] = useState(invoiceToEdit ? invoiceToEdit.customerName : '');
   const [customerPhone, setCustomerPhone] = useState(invoiceToEdit ? invoiceToEdit.customerPhone || '' : '');
+  const [salesCode, setSalesCode] = useState(invoiceToEdit ? invoiceToEdit.salesCode || '' : '');
   const [date, setDate] = useState(() => {
     if (invoiceToEdit) {
       return invoiceToEdit.date.slice(0, 10);
@@ -29,6 +30,12 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
+  const [deadlineDate, setDeadlineDate] = useState(() => {
+    if (invoiceToEdit && invoiceToEdit.deadlineDate) {
+      return invoiceToEdit.deadlineDate.slice(0, 10);
+    }
+    return '';
+  });
   const [notes, setNotes] = useState(invoiceToEdit ? invoiceToEdit.notes || '' : '');
   const [productionStatus, setProductionStatus] = useState<'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL'>(
     invoiceToEdit ? invoiceToEdit.productionStatus || 'ANTREAN' : 'ANTREAN'
@@ -36,6 +43,8 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
 
   // Selected item line builder
   const [selectedProductId, setSelectedProductId] = useState('');
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [itemQty, setItemQty] = useState<number>(1);
   const [customPrice, setCustomPrice] = useState<number>(0);
 
@@ -48,30 +57,101 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
   const [downPayment, setDownPayment] = useState<number>(
     invoiceToEdit ? invoiceToEdit.downPayment : 0
   );
+  const [paymentMethodDP, setPaymentMethodDP] = useState<'CASH' | 'TRANSFER'>(
+    invoiceToEdit ? (invoiceToEdit.paymentMethodDP || 'CASH') : 'CASH'
+  );
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Loaded bank accounts for transfer payment display in dropdown / lists
+  const [bankAccounts, setBankAccounts] = useState<{ id: string; bankName: string; accountNumber: string; accountOwner: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('athree_bank_accounts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const filtered = parsed.filter((acc: any) => acc.id !== 'bca-seed' && acc.id !== 'papua-seed' && acc.bankName !== 'BCA' && acc.bankName !== 'BANK PAPUA');
+        const hasBni = filtered.some((acc: any) => acc.accountNumber === '0152452997' || acc.id === 'bni-seed');
+        if (!hasBni) {
+          filtered.push({ id: 'bni-seed', bankName: 'BNI', accountNumber: '0152452997', accountOwner: 'DEWI ADHITYARANI M' });
+        }
+        return filtered;
+      }
+    } catch (e) {}
+    return [
+      { id: 'bni-seed', bankName: 'BNI', accountNumber: '0152452997', accountOwner: 'DEWI ADHITYARANI M' }
+    ];
+  });
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      try {
+        const saved = localStorage.getItem('athree_bank_accounts');
+        if (saved) setBankAccounts(JSON.parse(saved));
+      } catch (e) {}
+    };
+    window.addEventListener('athree-rekening-changed', handleRefresh);
+    return () => window.removeEventListener('athree-rekening-changed', handleRefresh);
+  }, []);
+
+  const [officialSales, setOfficialSales] = useState<{ code: string; name: string }[]>(() => {
+    const saved = localStorage.getItem('athree_sales_agents');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [
+      { code: 'SL-01', name: 'Dewi Lestari' },
+      { code: 'SL-02', name: 'Budi Hermawan' },
+      { code: 'SL-03', name: 'Stephanus' },
+      { code: 'SL-04', name: 'Martha Papua' }
+    ];
+  });
+
+  useEffect(() => {
+    const handleSyncSales = () => {
+      const saved = localStorage.getItem('athree_sales_agents');
+      if (saved) {
+        try {
+          setOfficialSales(JSON.parse(saved));
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('athree-sales-agents-changed', handleSyncSales);
+    window.addEventListener('storage', handleSyncSales);
+    return () => {
+      window.removeEventListener('athree-sales-agents-changed', handleSyncSales);
+      window.removeEventListener('storage', handleSyncSales);
+    };
+  }, []);
 
   // Synchronize form values when invoiceToEdit changes
   useEffect(() => {
     if (invoiceToEdit) {
       setCustomerName(invoiceToEdit.customerName);
       setCustomerPhone(invoiceToEdit.customerPhone || '');
+      setSalesCode(invoiceToEdit.salesCode || '');
       setDate(invoiceToEdit.date.slice(0, 10));
+      setDeadlineDate(invoiceToEdit.deadlineDate ? invoiceToEdit.deadlineDate.slice(0, 10) : '');
       setNotes(invoiceToEdit.notes || '');
       setProductionStatus(invoiceToEdit.productionStatus || 'ANTREAN');
       setDraftItems(invoiceToEdit.items);
       setDownPayment(invoiceToEdit.downPayment);
+      setPaymentMethodDP(invoiceToEdit.paymentMethodDP || 'CASH');
     } else {
       setCustomerName('');
       setCustomerPhone('');
+      setSalesCode('');
       const today = new Date();
       const year = today.getFullYear();
       const month = String(today.getMonth() + 1).padStart(2, '0');
       const day = String(today.getDate()).padStart(2, '0');
       setDate(`${year}-${month}-${day}`);
+      setDeadlineDate('');
       setNotes('');
       setProductionStatus('ANTREAN');
       setDraftItems([]);
       setDownPayment(0);
+      setPaymentMethodDP('CASH');
     }
     setErrorMessage('');
   }, [invoiceToEdit]);
@@ -168,6 +248,8 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
 
     // Reset items select form input
     setSelectedProductId('');
+    setProductSearchTerm('');
+    setIsProductDropdownOpen(false);
   };
 
   // Remove Item from draft
@@ -187,6 +269,15 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
     if (draftItems.length === 0) {
       setErrorMessage('Tambahkan minimal 1 item barang ke dalam daftar nota.');
       return;
+    }
+
+    if (salesCode.trim()) {
+      const codeToCheck = salesCode.trim().toUpperCase();
+      const isValid = officialSales.some(s => s.code.toUpperCase() === codeToCheck);
+      if (!isValid) {
+        setErrorMessage(`Kode Sales "${salesCode}" tidak terdaftar dalam daftar sales resmi! Silakan periksa kembali atau daftarkan Kode Sales baru di menu Pengaturan Toko.`);
+        return;
+      }
     }
 
     if (downPayment < 0) {
@@ -223,6 +314,7 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
       date,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim() || undefined,
+      salesCode: salesCode.trim() || undefined,
       items: draftItems,
       totalQty,
       totalAmount,
@@ -232,7 +324,9 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
       status: currentStatusInfo.status,
       customStatusLabel: currentStatusInfo.label,
       notes: notes.trim() || undefined,
-      productionStatus: productionStatus
+      productionStatus: productionStatus,
+      deadlineDate: deadlineDate ? deadlineDate : undefined,
+      paymentMethodDP: downPayment > 0 ? paymentMethodDP : undefined
     };
 
     onSave(newInvoice, movements);
@@ -240,6 +334,8 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
     // Reset whole form states after save
     setCustomerName('');
     setCustomerPhone('');
+    setSalesCode('');
+    setDeadlineDate('');
     setNotes('');
     setProductionStatus('ANTREAN');
     setDraftItems([]);
@@ -346,6 +442,39 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
               </div>
 
               <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5" htmlFor="input-sales-code">
+                  Kode Sales (Opsional)
+                </label>
+                <input
+                  type="text"
+                  id="input-sales-code"
+                  placeholder="Contoh: SL-01, DEWI, dsb."
+                  value={salesCode}
+                  onChange={(e) => setSalesCode(e.target.value)}
+                  list="sales-suggestions"
+                  className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 hover:bg-indigo-50/20 focus:bg-white border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none focus:ring-0 rounded-2xl text-slate-800 placeholder-slate-400 outline-none transition duration-150 uppercase font-black tracking-normal"
+                />
+                <datalist id="sales-suggestions">
+                  {officialSales.map(s => (
+                    <option key={s.code} value={s.code}>{s.name}</option>
+                  ))}
+                </datalist>
+
+                {salesCode.trim() && (() => {
+                  const verified = officialSales.find(s => s.code.toUpperCase() === salesCode.trim().toUpperCase());
+                  return verified ? (
+                    <p className="mt-1 text-[10.5px] font-extrabold text-emerald-600 bg-emerald-50/50 px-2.5 py-1 rounded-xl inline-flex items-center gap-1 border border-emerald-100/40">
+                      <span>✓</span> Sales Terdaftar: <strong className="uppercase">{verified.name}</strong>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[10.5px] font-extrabold text-rose-600 bg-rose-50/50 px-2.5 py-1 rounded-xl inline-flex items-center gap-1 border border-rose-100/40">
+                      <span>✗</span> Kode tidak valid / tidak terdaftar
+                    </p>
+                  );
+                })()}
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5" htmlFor="input-invoice-date">
                   Tanggal Nota <span className="text-rose-500">*</span>
                 </label>
@@ -359,6 +488,24 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
                     required
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 text-sm bg-indigo-50/10 hover:bg-indigo-50/20 focus:bg-white border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none focus:ring-0 rounded-2xl text-slate-800 outline-none transition duration-150"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5" htmlFor="input-deadline-date">
+                  Tanggal Deadline (Tenggat Selesai) <span className="text-indigo-500/80 font-semibold">(Opsional)</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-indigo-400">
+                    <Calendar className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <input
+                    type="date"
+                    id="input-deadline-date"
+                    value={deadlineDate}
+                    onChange={(e) => setDeadlineDate(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 text-sm bg-indigo-50/10 hover:bg-indigo-50/20 focus:bg-white border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none focus:ring-0 rounded-2xl text-slate-800 outline-none transition duration-150"
                   />
                 </div>
@@ -408,28 +555,122 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
               
               {/* Product Select combobox */}
-              <div className="md:col-span-5">
-                <label className="block text-xs font-bold text-slate-500 mb-1" htmlFor="select-inventory-item">
-                  Pilih Produk Dari Gudang
+              <div className="md:col-span-5 relative" id="product-combobox-container">
+                <label className="block text-xs font-bold text-slate-500 mb-1" htmlFor="select-inventory-item-search">
+                  Pilih Produk Dari Gudang (Bisa Diketik)
                 </label>
-                <select
-                  id="select-inventory-item"
-                  value={selectedProductId}
-                  onChange={(e) => setSelectedProductId(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm bg-indigo-50/10 hover:bg-indigo-50/20 focus:bg-white border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none rounded-2xl text-slate-800 outline-none transition duration-155"
-                >
-                  <option value="">-- Silakan Pilih Produk --</option>
-                  {products.map((p) => (
-                    <option 
-                      key={p.id} 
-                      value={p.id} 
-                      className="bg-white text-slate-800"
-                      disabled={p.stock <= 0}
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="select-inventory-item-search"
+                    placeholder="Ketik nama produk untuk mencari..."
+                    value={activeProduct && !isProductDropdownOpen ? activeProduct.name : productSearchTerm}
+                    onFocus={() => {
+                      setIsProductDropdownOpen(true);
+                      if (activeProduct) {
+                        setProductSearchTerm('');
+                      }
+                    }}
+                    onChange={(e) => {
+                      setProductSearchTerm(e.target.value);
+                      setIsProductDropdownOpen(true);
+                    }}
+                    className="w-full pl-9 pr-8 py-2.5 text-xs font-bold bg-indigo-50/10 hover:bg-indigo-55/20 focus:bg-white border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none rounded-2xl text-slate-800 placeholder-slate-400 outline-none transition duration-155"
+                  />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <Search className="w-4 h-4 text-indigo-400" />
+                  </div>
+                  {selectedProductId ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProductId('');
+                        setProductSearchTerm('');
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-650 border-none bg-transparent cursor-pointer flex items-center justify-center rounded-lg hover:bg-rose-50"
+                      title="Hapus pilihan"
                     >
-                      {p.name} {p.stock === 0 ? '(STOK HABIS)' : `[Stok: ${p.stock} ${p.unit}]`} - {formatRp(p.sellPrice)}
-                    </option>
-                  ))}
-                </select>
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Dropdown list of filtered products */}
+                {isProductDropdownOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-30" 
+                      onClick={() => setIsProductDropdownOpen(false)}
+                    />
+                    <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border-2 border-indigo-100 rounded-2xl shadow-xl z-40 divide-y divide-slate-100 select-none">
+                      {(() => {
+                        const filtered = products.filter(p => 
+                          p.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+                          (p.sku && p.sku.toLowerCase().includes(productSearchTerm.toLowerCase()))
+                        );
+                        
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="p-4 text-xs font-black text-slate-400 text-center flex flex-col items-center justify-center gap-1">
+                              <span>❌ Produk tidak ditemukan</span>
+                              <span className="text-[10px] font-medium text-slate-400">Coba kata kunci pencarian lainnya</span>
+                            </div>
+                          );
+                        }
+                        
+                        return filtered.map((p) => {
+                          const isSelected = p.id === selectedProductId;
+                          const isOutOfStock = p.stock <= 0;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                if (!isOutOfStock) {
+                                  setSelectedProductId(p.id);
+                                  setProductSearchTerm('');
+                                  setIsProductDropdownOpen(false);
+                                }
+                              }}
+                              className={`w-full text-left px-3.5 py-3 text-xs transition duration-100 flex items-center justify-between border-none cursor-pointer ${
+                                isSelected 
+                                  ? 'bg-indigo-50 text-indigo-700 font-extrabold' 
+                                  : isOutOfStock 
+                                    ? 'bg-slate-50 text-slate-300 cursor-not-allowed opacity-60' 
+                                    : 'bg-white hover:bg-slate-50 text-slate-700 hover:text-indigo-650 font-bold'
+                              }`}
+                            >
+                              <div className="space-y-0.5">
+                                <span className={`block ${isSelected ? 'font-black text-indigo-700' : isOutOfStock ? 'text-slate-350 line-through' : 'text-slate-800'}`}>
+                                  {p.name}
+                                </span>
+                                {p.sku && (
+                                  <span className="text-[9.5px] text-slate-400 font-mono tracking-tight font-medium">SKU: {p.sku}</span>
+                                )}
+                              </div>
+                              <div className="text-right flex flex-col items-end gap-1 shrink-0">
+                                <span className={`font-mono ${isSelected ? 'font-black text-indigo-700' : isOutOfStock ? 'text-slate-300' : 'font-extrabold text-slate-800'}`}>
+                                  {formatRp(p.sellPrice)}
+                                </span>
+                                <span className={`text-[9.5px] px-1.5 py-0.5 rounded-md font-extrabold uppercase tracking-wider ${
+                                  isOutOfStock 
+                                    ? 'bg-rose-50 text-rose-500' 
+                                    : 'bg-emerald-50 text-emerald-600'
+                                }`}>
+                                  {isOutOfStock ? 'HABIS' : `Stok: ${p.stock} ${p.unit}`}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Price adjustments (editable sell price per deal) */}
@@ -591,6 +832,56 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
                 </span>
               </div>
             </div>
+
+            {/* DP Payment Method Selection */}
+            {downPayment > 0 && (
+              <div className="space-y-2 p-3 bg-indigo-50/20 border border-indigo-100/50 rounded-2xl">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Metode Pembayaran DP
+                </label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethodDP('CASH')}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-xl border transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      paymentMethodDP === 'CASH'
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-extrabold shadow-3xs'
+                        : 'border-slate-100 bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700'
+                    }`}
+                  >
+                    💵 Tunai (Cash)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethodDP('TRANSFER')}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-xl border transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      paymentMethodDP === 'TRANSFER'
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-extrabold shadow-3xs'
+                        : 'border-slate-100 bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700'
+                    }`}
+                  >
+                    🏦 Transfer Bank
+                  </button>
+                </div>
+
+                {paymentMethodDP === 'TRANSFER' && bankAccounts.length > 0 && (
+                  <div className="mt-2 text-[10.5px] border-t border-indigo-100/50 pt-2.5 space-y-1.5">
+                    <p className="font-extrabold text-slate-500 uppercase tracking-wider block">Pilihan Rekening Pembayaran Toko:</p>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {bankAccounts.map((acc) => (
+                        <div key={acc.id} className="p-2 border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 rounded-xl flex justify-between items-center">
+                          <div className="leading-normal">
+                            <span className="font-black text-indigo-600 block">{acc.bankName}</span>
+                            <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{acc.accountNumber}</span>
+                          </div>
+                          <span className="font-bold text-[9.5px] text-slate-400 text-right leading-none block">a/n {acc.accountOwner}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Outstanding Receivables (Piutang) */}
             <div className="space-y-3 pt-3 border-t-2 border-indigo-50">

@@ -1,0 +1,154 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Master stock item record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sku": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "sellPrice": { "type": "number" },
+        "buyPrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "unit": { "type": "string" }
+      },
+      "required": ["id", "sku", "name", "sellPrice", "buyPrice", "stock"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Invoice note record for custom orders",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNum": { "type": "string" },
+        "date": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "items": { "type": "array" },
+        "totalQty": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "downPayment": { "type": "number" },
+        "settlement": { "type": "number" },
+        "remainingDebt": { "type": "number" },
+        "status": { "type": "string" },
+        "customStatusLabel": { "type": "string" },
+        "notes": { "type": "string" },
+        "productionStatus": { "type": "string" },
+        "deadlineDate": { "type": "string" },
+        "salesCode": { "type": "string" }
+      },
+      "required": ["id", "invoiceNum", "customerName", "totalAmount"]
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "description": "Stock change history movement ledger",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "sku": { "type": "string" },
+        "type": { "type": "string" },
+        "qty": { "type": "number" },
+        "prevStock": { "type": "number" },
+        "currStock": { "type": "number" },
+        "date": { "type": "string" },
+        "reference": { "type": "string" }
+      },
+      "required": ["id", "productId", "type", "qty"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Operational change audit log trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "user": { "type": "string" },
+        "actionType": { "type": "string" },
+        "module": { "type": "string" },
+        "description": { "type": "string" },
+        "referenceNum": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "user", "actionType"]
+    },
+    "PaymentTransaction": {
+      "title": "PaymentTransaction",
+      "description": "Financial cashier transactional payment ledger",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceId": { "type": "string" },
+        "invoiceNum": { "type": "string" },
+        "customerName": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "type": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "cashier": { "type": "string" }
+      },
+      "required": ["id", "invoiceId", "amount", "method", "timestamp"]
+    },
+    "CashierSession": {
+      "title": "CashierSession",
+      "description": "Daily/shifts cash register drawer session history",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "openedAt": { "type": "string" },
+        "openedBy": { "type": "string" },
+        "openingBalance": { "type": "number" },
+        "closedAt": { "type": "string" },
+        "closedBy": { "type": "string" },
+        "expectedCash": { "type": "number" },
+        "actualCash": { "type": "number" },
+        "notes": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "openedAt", "openingBalance", "status"]
+    },
+    "Metadata": {
+      "title": "Metadata",
+      "description": "General system/active states store",
+      "type": "object",
+      "properties": {
+        "activeSession": { "type": "object" },
+        "kasirPassword": { "type": "string" },
+        "ownerPassword": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "products/{productId}": {
+      "schema": "Product",
+      "description": "Individual product master records"
+    },
+    "invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Invoice note database documents"
+    },
+    "movements/{movementId}": {
+      "schema": "StockMovement",
+      "description": "Stock changes ledger entries"
+    },
+    "audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Daily operational logs history list"
+    },
+    "payment_transactions/{txId}": {
+      "schema": "PaymentTransaction",
+      "description": "Financial payments log"
+    },
+    "sessions_history/{sessionId}": {
+      "schema": "CashierSession",
+      "description": "Closed/Open cash register drawers shift details"
+    },
+    "metadata/{metaId}": {
+      "schema": "Metadata",
+      "description": "Special collection representing general database state values (e.g. activeSession, syncMetadata)"
+    }
+  }
+}
