@@ -200,6 +200,32 @@ export default function PengaturanToko({
     };
   }, []);
 
+  useEffect(() => {
+    const handleSyncLogo = () => {
+      try {
+        const type = (localStorage.getItem('athree-shop-logo-type') as 'none' | 'preset' | 'custom') || 'preset';
+        const pKey = localStorage.getItem('athree-shop-logo-preset') || 'shield';
+        const cUrl = localStorage.getItem('athree_custom_logo_data');
+        const sName = localStorage.getItem('athree-shop-name') || 'ATHREE STUDIO JAYAPURA';
+        const sSlogan = localStorage.getItem('athree-shop-slogan') || 'Studio Printing, Custom Apparel, Sablon Jersey Premium & Digital Printing Terpercaya.';
+        
+        setLogoType(type);
+        setPresetKey(pKey);
+        setCustomUrl(cUrl);
+        setShopName(sName);
+        setShopSlogan(sSlogan);
+      } catch (e) {
+        console.error("Gagal sinkronisasi logo di PengaturanToko:", e);
+      }
+    };
+    window.addEventListener('athree-logo-changed', handleSyncLogo);
+    window.addEventListener('storage', handleSyncLogo);
+    return () => {
+      window.removeEventListener('athree-logo-changed', handleSyncLogo);
+      window.removeEventListener('storage', handleSyncLogo);
+    };
+  }, []);
+
   // States for editing a sales agent
   const [editingAgentCode, setEditingAgentCode] = useState<string | null>(null);
   const [editingNewCode, setEditingNewCode] = useState('');

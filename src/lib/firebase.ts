@@ -8,7 +8,7 @@ import {
   writeBatch,
   deleteDoc
 } from 'firebase/firestore';
-import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession, SalesAgent } from '../types';
+import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession, SalesAgent, ShopSettings } from '../types';
 
 // Load direct config from firebase-applet-config.json credentials
 const firebaseConfig = {
@@ -240,6 +240,39 @@ export async function loadSalesAgentsFromFirestore(): Promise<SalesAgent[] | nul
   } catch (error) {
     console.warn('Gagal memuat sales_agents dari Firebase:', error);
     // Return null so we can fallback to defaults gracefully
+    return null;
+  }
+}
+
+export async function saveShopSettingsToFirestore(settings: ShopSettings): Promise<void> {
+  try {
+    const docRef = doc(db, 'metadata', 'shop_settings');
+    await setDoc(docRef, cleanUndefined({ id: 'shop_settings', ...settings }));
+  } catch (error) {
+    console.error('Gagal simpan shop_settings ke Firebase:', error);
+    handleFirestoreError(error, OperationType.WRITE, 'metadata/shop_settings');
+  }
+}
+
+export async function loadShopSettingsFromFirestore(): Promise<ShopSettings | null> {
+  try {
+    const docSnap = await getDocs(collection(db, 'metadata'));
+    let settings: ShopSettings | null = null;
+    docSnap.forEach((ds) => {
+      if (ds.id === 'shop_settings') {
+        const data = ds.data();
+        settings = {
+          logoType: data.logoType || 'preset',
+          presetKey: data.presetKey || 'shield',
+          customUrl: data.customUrl || null,
+          shopName: data.shopName || 'ATHREE STUDIO JAYAPURA',
+          shopSlogan: data.shopSlogan || 'Studio Printing, Custom Apparel, Sablon Jersey Premium & Digital Printing Terpercaya.',
+        };
+      }
+    });
+    return settings;
+  } catch (error) {
+    console.warn('Gagal memuat shop_settings dari Firebase:', error);
     return null;
   }
 }

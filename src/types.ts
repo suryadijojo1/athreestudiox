@@ -100,4 +100,13 @@ export interface SalesAgent {
   name: string;
 }
 
+export interface ShopSettings {
+  id?: string;
+  logoType: 'none' | 'preset' | 'custom';
+  presetKey: string;
+  customUrl: string | null;
+  shopName: string;
+  shopSlogan: string;
+}
+
 

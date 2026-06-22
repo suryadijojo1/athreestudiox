@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession } from './types';
+import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession, ShopSettings } from './types';
 import { motion } from 'motion/react';
 import { INITIAL_PRODUCTS, INITIAL_INVOICES, INITIAL_MOVEMENTS, INITIAL_AUDIT_LOGS } from './initialData';
 import { doc, getDocFromServer } from 'firebase/firestore';
@@ -19,6 +19,8 @@ import {
   saveCredentialsToFirestore,
   loadSalesAgentsFromFirestore,
   saveSalesAgentsToFirestore,
+  saveShopSettingsToFirestore,
+  loadShopSettingsFromFirestore,
   SystemCredentials,
   db
 } from './lib/firebase';
@@ -388,6 +390,7 @@ export default function App() {
         const dbActiveSession = await loadActiveSessionFromFirestore();
         const dbCredentials = await loadCredentialsFromFirestore();
         const dbSalesAgents = await loadSalesAgentsFromFirestore();
+        const dbShopSettings = await loadShopSettingsFromFirestore();
 
         if (dbCredentials) {
           if (dbCredentials.kasirPassword) {
@@ -431,6 +434,19 @@ export default function App() {
             window.dispatchEvent(new Event('athree-sales-agents-changed'));
           }
 
+          if (dbShopSettings) {
+            localStorage.setItem('athree-shop-logo-type', dbShopSettings.logoType);
+            localStorage.setItem('athree-shop-logo-preset', dbShopSettings.presetKey);
+            if (dbShopSettings.customUrl) {
+              localStorage.setItem('athree_custom_logo_data', dbShopSettings.customUrl);
+            } else {
+              localStorage.removeItem('athree_custom_logo_data');
+            }
+            localStorage.setItem('athree-shop-name', dbShopSettings.shopName);
+            localStorage.setItem('athree-shop-slogan', dbShopSettings.shopSlogan);
+            window.dispatchEvent(new Event('athree-logo-changed'));
+          }
+
           setFirebaseStatus('CONNECTED');
         } else {
           console.log("Cloud Firebase kosong. Melakukan inisialisasi awal ke cloud...");
@@ -472,6 +488,34 @@ export default function App() {
           localStorage.setItem('athree_sales_agents', JSON.stringify(seedSalesAgents));
           await saveSalesAgentsToFirestore(seedSalesAgents);
           window.dispatchEvent(new Event('athree-sales-agents-changed'));
+
+          // Seed shop settings
+          const storedLogoType = localStorage.getItem('athree-shop-logo-type') || 'preset';
+          const storedPresetKey = localStorage.getItem('athree-shop-logo-preset') || 'shield';
+          const storedCustomUrl = localStorage.getItem('athree_custom_logo_data') || null;
+          const storedShopName = localStorage.getItem('athree-shop-name') || 'ATHREE STUDIO JAYAPURA';
+          const storedShopSlogan = localStorage.getItem('athree-shop-slogan') || 'Studio Printing, Custom Apparel, Sablon Jersey Premium & Digital Printing Terpercaya.';
+
+          const seedShopSettings: ShopSettings = {
+            logoType: storedLogoType as any,
+            presetKey: storedPresetKey,
+            customUrl: storedCustomUrl,
+            shopName: storedShopName,
+            shopSlogan: storedShopSlogan
+          };
+          
+          localStorage.setItem('athree-shop-logo-type', storedLogoType);
+          localStorage.setItem('athree-shop-logo-preset', storedPresetKey);
+          if (storedCustomUrl) {
+            localStorage.setItem('athree_custom_logo_data', storedCustomUrl);
+          } else {
+            localStorage.removeItem('athree_custom_logo_data');
+          }
+          localStorage.setItem('athree-shop-name', storedShopName);
+          localStorage.setItem('athree-shop-slogan', storedShopSlogan);
+
+          await saveShopSettingsToFirestore(seedShopSettings);
+          window.dispatchEvent(new Event('athree-logo-changed'));
 
           const storedPayments = localStorage.getItem('nota_stok_payment_transactions');
           let seedPayments: PaymentTransaction[] = [];
@@ -614,6 +658,36 @@ export default function App() {
     window.addEventListener('athree-sales-agents-changed', handleSyncSalesToCloud);
     return () => {
       window.removeEventListener('athree-sales-agents-changed', handleSyncSalesToCloud);
+    };
+  }, [firebaseStatus]);
+
+  useEffect(() => {
+    const handleSyncLogoToCloud = async () => {
+      try {
+        if (firebaseStatus === 'CONNECTED') {
+          const type = (localStorage.getItem('athree-shop-logo-type') as 'none' | 'preset' | 'custom') || 'preset';
+          const pKey = localStorage.getItem('athree-shop-logo-preset') || 'shield';
+          const cUrl = localStorage.getItem('athree_custom_logo_data');
+          const sName = localStorage.getItem('athree-shop-name') || 'ATHREE STUDIO JAYAPURA';
+          const sSlogan = localStorage.getItem('athree-shop-slogan') || 'Studio Printing, Custom Apparel, Sablon Jersey Premium & Digital Printing Terpercaya.';
+
+          const settings: ShopSettings = {
+            logoType: type,
+            presetKey: pKey,
+            customUrl: cUrl,
+            shopName: sName,
+            shopSlogan: sSlogan
+          };
+          await saveShopSettingsToFirestore(settings);
+          console.log("Sinkronisasi logo dan id toko ke cloud sukses!");
+        }
+      } catch (e) {
+        console.error("Gagal sinkronisasi shop logo settings ke firestore:", e);
+      }
+    };
+    window.addEventListener('athree-logo-changed', handleSyncLogoToCloud);
+    return () => {
+      window.removeEventListener('athree-logo-changed', handleSyncLogoToCloud);
     };
   }, [firebaseStatus]);
 
