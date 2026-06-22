@@ -96,6 +96,34 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
     };
   }, []);
 
+  const [salesAgents, setSalesAgents] = useState<{ code: string; name: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('athree_sales_agents');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [
+      { code: 'SL-01', name: 'Dewi Lestari' },
+      { code: 'SL-02', name: 'Budi Hermawan' },
+      { code: 'SL-03', name: 'Stephanus' },
+      { code: 'SL-04', name: 'Martha Papua' }
+    ];
+  });
+
+  React.useEffect(() => {
+    const handleRefreshSales = () => {
+      try {
+        const saved = localStorage.getItem('athree_sales_agents');
+        if (saved) setSalesAgents(JSON.parse(saved));
+      } catch (e) {}
+    };
+    window.addEventListener('athree-sales-agents-changed', handleRefreshSales);
+    window.addEventListener('storage', handleRefreshSales);
+    return () => {
+      window.removeEventListener('athree-sales-agents-changed', handleRefreshSales);
+      window.removeEventListener('storage', handleRefreshSales);
+    };
+  }, []);
+
   // Automatically read user's last used printer size on mount / modal open
   React.useEffect(() => {
     if (invoice) {
@@ -612,11 +640,15 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
                       No. Telp / WA: <strong className="font-mono text-slate-800 print:text-black">{invoice.customerPhone}</strong>
                     </p>
                   )}
-                  {invoice.salesCode && (
-                    <p className="text-slate-600 mt-1 print:text-slate-705 font-bold text-xs flex items-center gap-1">
-                      Sales: <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-lg uppercase tracking-wider print:border print:border-slate-300">{invoice.salesCode}</span>
-                    </p>
-                  )}
+                  {invoice.salesCode && (() => {
+                    const agent = salesAgents.find(s => s.code.toUpperCase() === invoice.salesCode?.trim().toUpperCase());
+                    return (
+                      <p className="text-slate-600 mt-1 print:text-slate-705 font-bold text-xs flex items-center flex-wrap gap-1">
+                        Sales: <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-lg uppercase tracking-wider print:border print:border-slate-300">{invoice.salesCode}</span>
+                        {agent && <span className="text-[11px] text-slate-500 font-medium font-sans">({agent.name})</span>}
+                      </p>
+                    );
+                  })()}
                 </div>
 
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/80 print:bg-white print:border-slate-300">
@@ -836,12 +868,15 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
                     <span>{invoice.customerPhone}</span>
                   </div>
                 )}
-                {invoice.salesCode && (
-                  <div className="flex justify-between">
-                    <span>Sales    :</span>
-                    <span className="font-semibold text-black">{invoice.salesCode}</span>
-                  </div>
-                )}
+                 {invoice.salesCode && (() => {
+                   const agent = salesAgents.find(s => s.code.toUpperCase() === invoice.salesCode?.trim().toUpperCase());
+                   return (
+                     <div className="flex justify-between">
+                       <span>Sales    :</span>
+                       <span className="font-semibold text-black">{invoice.salesCode} {agent ? `(${agent.name})` : ''}</span>
+                     </div>
+                   );
+                 })()}
                 <div className="flex justify-between">
                   <span>Status Payment:</span>
                   <span className="font-black text-black">

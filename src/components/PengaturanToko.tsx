@@ -181,6 +181,25 @@ export default function PengaturanToko({
   const [newSalesCode, setNewSalesCode] = useState('');
   const [newSalesName, setNewSalesName] = useState('');
 
+  useEffect(() => {
+    const handleSyncSales = () => {
+      try {
+        const saved = localStorage.getItem('athree_sales_agents');
+        if (saved) {
+          setSalesAgents(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.error("Gagal sinkronisasi sales agents di PengaturanToko:", e);
+      }
+    };
+    window.addEventListener('athree-sales-agents-changed', handleSyncSales);
+    window.addEventListener('storage', handleSyncSales);
+    return () => {
+      window.removeEventListener('athree-sales-agents-changed', handleSyncSales);
+      window.removeEventListener('storage', handleSyncSales);
+    };
+  }, []);
+
   // States for editing a sales agent
   const [editingAgentCode, setEditingAgentCode] = useState<string | null>(null);
   const [editingNewCode, setEditingNewCode] = useState('');

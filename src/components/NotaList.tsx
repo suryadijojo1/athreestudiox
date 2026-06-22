@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Invoice } from '../types';
 import { Search, Eye, CircleDollarSign, Calendar, ChevronRight, Filter, Receipt, Edit, Printer, AlertTriangle, Clock, Info, Bell, Trash2 } from 'lucide-react';
 
@@ -21,6 +21,7 @@ interface NotaListProps {
 export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, onUpdateProductionStatus, onEditInvoice, onQuickPrint, onDeleteInvoice, userRole = 'OWNER' }: NotaListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'SEMAU' | 'LUNAS' | 'DP' | 'BELUM_BAYAR'>('SEMAU');
+  const [productionFilter, setProductionFilter] = useState<'SEMAU' | 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL'>('SEMAU');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [deadlineAlertFilter, setDeadlineAlertFilter] = useState<boolean>(false);
@@ -59,6 +60,34 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     };
     window.addEventListener('athree-rekening-changed', handleRefresh);
     return () => window.removeEventListener('athree-rekening-changed', handleRefresh);
+  }, []);
+
+  const [salesAgents, setSalesAgents] = useState<{ code: string; name: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('athree_sales_agents');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [
+      { code: 'SL-01', name: 'Dewi Lestari' },
+      { code: 'SL-02', name: 'Budi Hermawan' },
+      { code: 'SL-03', name: 'Stephanus' },
+      { code: 'SL-04', name: 'Martha Papua' }
+    ];
+  });
+
+  useEffect(() => {
+    const handleRefreshSales = () => {
+      try {
+        const saved = localStorage.getItem('athree_sales_agents');
+        if (saved) setSalesAgents(JSON.parse(saved));
+      } catch (e) {}
+    };
+    window.addEventListener('athree-sales-agents-changed', handleRefreshSales);
+    window.addEventListener('storage', handleRefreshSales);
+    return () => {
+      window.removeEventListener('athree-sales-agents-changed', handleRefreshSales);
+      window.removeEventListener('storage', handleRefreshSales);
+    };
   }, []);
 
   const formatRp = (value: number) => {
@@ -204,6 +233,12 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     
     // Check status filter
     if (statusFilter !== 'SEMAU' && inv.status !== statusFilter) return false;
+
+    // Check production status filter
+    if (productionFilter !== 'SEMAU') {
+      const currentProdStatus = inv.productionStatus || 'ANTREAN';
+      if (currentProdStatus !== productionFilter) return false;
+    }
 
     // Check deadline alert filter
     if (deadlineAlertFilter) {
@@ -366,6 +401,27 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
               DP Active
             </button>
           </div>
+
+          {/* Filter Status Produksi */}
+          <div className="flex items-center gap-1.5 bg-white p-1.5 border-2 border-indigo-100 rounded-2xl shadow-sm flex-shrink-0">
+            <span className="text-[10px] uppercase font-black text-slate-400 px-2 flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-indigo-500" />
+              Produksi:
+            </span>
+            <select
+              id="filter-production-select"
+              value={productionFilter}
+              onChange={(e) => setProductionFilter(e.target.value as any)}
+              className="bg-slate-50 border-2 border-indigo-50/50 hover:border-indigo-200 focus:border-indigo-500 text-xs font-black text-slate-705 rounded-xl px-2.5 py-1 outline-none transition cursor-pointer"
+            >
+              <option value="SEMAU">✨ SEMUA PEKERJAAN</option>
+              <option value="ANTREAN">⏳ ANTREAN</option>
+              <option value="DESAIN">✏️ TAHAP DESAIN</option>
+              <option value="PROSES">⚙️ PROSES PRODUKSI</option>
+              <option value="SELESAI">✅ SELESAI PRODUKSI</option>
+              <option value="SIAP_DIAMBIL">📦 SIAP DIAMBIL</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -429,13 +485,16 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                       <div className="font-bold text-slate-800 truncate" title={inv.customerName}>
                         {inv.customerName}
                       </div>
-                      {inv.salesCode && (
-                        <div className="mt-0.5">
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100/30">
-                            Sales: {inv.salesCode}
-                          </span>
-                        </div>
-                      )}
+                      {inv.salesCode && (() => {
+                        const agent = salesAgents.find(s => s.code.toUpperCase() === inv.salesCode?.trim().toUpperCase());
+                        return (
+                          <div className="mt-0.5">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100/30 max-w-full truncate" title={`Sales: ${inv.salesCode} ${agent ? `(${agent.name})` : ''}`}>
+                              Sales: {inv.salesCode} {agent ? `(${agent.name})` : ''}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Total Qty */}
