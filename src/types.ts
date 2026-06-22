@@ -95,3 +95,9 @@ export interface AuditLog {
   referenceNum?: string; // e.g., invoice number or product name
 }
 
+export interface SalesAgent {
+  code: string;
+  name: string;
+}
+
+

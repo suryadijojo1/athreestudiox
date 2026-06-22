@@ -39,13 +39,14 @@ export interface SalesAgent {
 }
 
 interface PengaturanTokoProps {
-  userRole?: 'KASIR' | 'OWNER';
+  userRole?: 'KASIR' | 'OWNER' | 'PRODUKSI';
   setActiveTab?: (tab: string) => void;
   theme?: 'light' | 'dark';
   setTheme?: (theme: 'light' | 'dark') => void;
   kasirPassword?: string;
   ownerPassword?: string;
-  onUpdatePasswords?: (newKasirPass: string, newOwnerPass: string) => Promise<void>;
+  produksiPassword?: string;
+  onUpdatePasswords?: (newKasirPass: string, newOwnerPass: string, newProduksiPass: string) => Promise<void>;
   onResetStokBarang?: (mode: 'EMPTY' | 'PRESET') => void;
   onResetDaftarNota?: (mode: 'EMPTY' | 'PRESET') => void;
 }
@@ -57,6 +58,7 @@ export default function PengaturanToko({
   setTheme,
   kasirPassword = 'admin',
   ownerPassword = 'Owner',
+  produksiPassword = 'admin',
   onUpdatePasswords,
   onResetStokBarang,
   onResetDaftarNota
@@ -64,6 +66,7 @@ export default function PengaturanToko({
   // Password panel states
   const [newKasirPassword, setNewKasirPassword] = useState(kasirPassword);
   const [newOwnerPassword, setNewOwnerPassword] = useState(ownerPassword);
+  const [newProduksiPassword, setNewProduksiPassword] = useState(produksiPassword);
   const [isUpdatingPass, setIsUpdatingPass] = useState(false);
   const [passSuccessMsg, setPassSuccessMsg] = useState('');
 
@@ -76,9 +79,13 @@ export default function PengaturanToko({
     setNewOwnerPassword(ownerPassword);
   }, [ownerPassword]);
 
+  useEffect(() => {
+    setNewProduksiPassword(produksiPassword);
+  }, [produksiPassword]);
+
   const handleUpdatePasswordsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newKasirPassword.trim() || !newOwnerPassword.trim()) {
+    if (!newKasirPassword.trim() || !newOwnerPassword.trim() || !newProduksiPassword.trim()) {
       alert('Password tidak boleh kosong!');
       return;
     }
@@ -86,7 +93,7 @@ export default function PengaturanToko({
     setPassSuccessMsg('');
     try {
       if (onUpdatePasswords) {
-        await onUpdatePasswords(newKasirPassword.trim(), newOwnerPassword.trim());
+        await onUpdatePasswords(newKasirPassword.trim(), newOwnerPassword.trim(), newProduksiPassword.trim());
         setPassSuccessMsg('Sandi berhasil diperbarui secara permanen dan disinkronkan ke Cloud Firebase!');
         setTimeout(() => setPassSuccessMsg(''), 5000);
       }
@@ -1251,7 +1258,7 @@ export default function PengaturanToko({
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
                     {/* INPUT: KASIR PASSWORD */}
                     <div className="space-y-1">
                       <label className="text-[10.5px] font-black uppercase text-indigo-700 tracking-wider block">Kata Sandi Baru Kasir</label>
@@ -1283,6 +1290,24 @@ export default function PengaturanToko({
                           placeholder="Sandi Owner baru"
                           value={newOwnerPassword}
                           onChange={(e) => setNewOwnerPassword(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-indigo-50/50 focus:border-indigo-400 rounded-2xl pl-10 pr-3.5 py-2.5 text-xs font-bold text-slate-850 dark:text-slate-100 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* INPUT: PRODUKSI PASSWORD */}
+                    <div className="space-y-1">
+                      <label className="text-[10.5px] font-black uppercase text-indigo-700 tracking-wider block">Kata Sandi Baru Produksi</label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+                          <Lock className="w-3.5 h-3.5 text-slate-400" />
+                        </span>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Sandi Produksi baru"
+                          value={newProduksiPassword}
+                          onChange={(e) => setNewProduksiPassword(e.target.value)}
                           className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-indigo-50/50 focus:border-indigo-400 rounded-2xl pl-10 pr-3.5 py-2.5 text-xs font-bold text-slate-850 dark:text-slate-100 focus:outline-none"
                         />
                       </div>

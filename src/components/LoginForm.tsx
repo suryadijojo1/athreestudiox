@@ -5,9 +5,10 @@ interface LoginFormProps {
   onLoginSuccess: (role: 'KASIR' | 'OWNER' | 'PRODUKSI') => void;
   kasirPassword?: string;
   ownerPassword?: string;
+  produksiPassword?: string;
 }
 
-export default function LoginForm({ onLoginSuccess, kasirPassword = 'admin', ownerPassword = 'Owner' }: LoginFormProps) {
+export default function LoginForm({ onLoginSuccess, kasirPassword = 'admin', ownerPassword = 'Owner', produksiPassword = 'admin' }: LoginFormProps) {
   const [selectedRole, setSelectedRole] = useState<'KASIR' | 'OWNER' | 'PRODUKSI'>('KASIR');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -42,7 +43,11 @@ export default function LoginForm({ onLoginSuccess, kasirPassword = 'admin', own
         setErrorMsg('Password salah! Pastikan huruf besar/kecil benar.');
       }
     } else if (selectedRole === 'PRODUKSI') {
-      onLoginSuccess('PRODUKSI');
+      if (password === produksiPassword) {
+        onLoginSuccess('PRODUKSI');
+      } else {
+        setErrorMsg('Password salah! Silakan hubungi Owner jika password diubah.');
+      }
     }
   };
 
@@ -160,37 +165,32 @@ export default function LoginForm({ onLoginSuccess, kasirPassword = 'admin', own
           </div>
 
           {/* Password Input Block */}
-          {selectedRole !== 'PRODUKSI' ? (
-            <div className="space-y-1.5 relative">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                <span>Password Keamanan</span>
-                <span className="font-medium text-[10px] text-slate-400">
-                  {selectedRole === 'KASIR' 
-                    ? (kasirPassword === 'admin' ? 'Petunjuk: admin' : 'Password terpaut di sistem')
-                    : (ownerPassword === 'Owner' ? 'Petunjuk: Owner' : 'Password terpaut di sistem')}
-                </span>
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-                  <Lock className="w-4 h-4" />
-                </span>
-                <input
-                  id="login-input-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={`Masukkan password ${selectedRole.toLowerCase()}...`}
-                  required
-                  className="w-full bg-slate-50 border-2 border-indigo-50 focus:border-indigo-500 rounded-2xl py-3.5 pl-10 pr-4 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none transition duration-150"
-                />
-              </div>
+          <div className="space-y-1.5 relative">
+            <label className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Password Keamanan</span>
+              <span className="font-medium text-[10px] text-slate-400 font-mono">
+                {selectedRole === 'KASIR' 
+                  ? (kasirPassword === 'admin' ? 'Petunjuk: admin' : 'Password terpaut di sistem')
+                  : selectedRole === 'OWNER'
+                    ? (ownerPassword === 'Owner' ? 'Petunjuk: Owner' : 'Password terpaut di sistem')
+                    : (produksiPassword === 'admin' ? 'Petunjuk: admin' : 'Password terpaut di sistem')}
+              </span>
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+                <Lock className="w-4 h-4" />
+              </span>
+              <input
+                id="login-input-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={`Masukkan password ${selectedRole.toLowerCase()}...`}
+                required
+                className="w-full bg-slate-50 border-2 border-indigo-50 focus:border-indigo-500 rounded-2xl py-3.5 pl-10 pr-4 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none transition duration-150"
+              />
             </div>
-          ) : (
-            <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex items-start gap-2.5 text-indigo-950 text-xs font-medium leading-relaxed">
-              <Sparkles className="w-4 h-4 shrink-0 text-indigo-500 mt-0.5 animate-pulse" />
-              <span>Bagian Produksi tidak memerlukan password keamanan. Anda dapat langsung mengklik tombol di bawah untuk masuk ke dashboard pemantauan produksi.</span>
-            </div>
-          )}
+          </div>
 
           {/* Responsive live feedback error notification banner */}
           {errorMsg && (

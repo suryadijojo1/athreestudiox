@@ -17,6 +17,8 @@ import {
   loadActiveSessionFromFirestore,
   loadCredentialsFromFirestore,
   saveCredentialsToFirestore,
+  loadSalesAgentsFromFirestore,
+  saveSalesAgentsToFirestore,
   SystemCredentials,
   db
 } from './lib/firebase';
@@ -158,6 +160,9 @@ export default function App() {
   });
   const [ownerPassword, setOwnerPassword] = useState<string>(() => {
     return localStorage.getItem('nota_stok_owner_password') || 'Owner';
+  });
+  const [produksiPassword, setProduksiPassword] = useState<string>(() => {
+    return localStorage.getItem('nota_stok_produksi_password') || 'admin';
   });
 
   // Cash accounting states (daily cash desk sessions)
@@ -382,6 +387,7 @@ export default function App() {
         const dbHistory = await loadCollectionFromFirestore<CashierSession>('sessions_history');
         const dbActiveSession = await loadActiveSessionFromFirestore();
         const dbCredentials = await loadCredentialsFromFirestore();
+        const dbSalesAgents = await loadSalesAgentsFromFirestore();
 
         if (dbCredentials) {
           if (dbCredentials.kasirPassword) {
@@ -391,6 +397,10 @@ export default function App() {
           if (dbCredentials.ownerPassword) {
             setOwnerPassword(dbCredentials.ownerPassword);
             localStorage.setItem('nota_stok_owner_password', dbCredentials.ownerPassword);
+          }
+          if (dbCredentials.produksiPassword) {
+            setProduksiPassword(dbCredentials.produksiPassword);
+            localStorage.setItem('nota_stok_produksi_password', dbCredentials.produksiPassword);
           }
         }
 
@@ -415,6 +425,12 @@ export default function App() {
           } else {
             localStorage.removeItem('nota_stok_active_session');
           }
+
+          if (dbSalesAgents) {
+            localStorage.setItem('athree_sales_agents', JSON.stringify(dbSalesAgents));
+            window.dispatchEvent(new Event('athree-sales-agents-changed'));
+          }
+
           setFirebaseStatus('CONNECTED');
         } else {
           console.log("Cloud Firebase kosong. Melakukan inisialisasi awal ke cloud...");
@@ -444,6 +460,18 @@ export default function App() {
           await saveCollectionInBatches('invoices', seedInvs);
           await saveCollectionInBatches('movements', seedMoves);
           await saveCollectionInBatches('audit_logs', seedLogs);
+
+          // Seed sales agents
+          const storedSalesAgents = localStorage.getItem('athree_sales_agents');
+          let seedSalesAgents = storedSalesAgents ? JSON.parse(storedSalesAgents) : [
+            { code: 'SL-01', name: 'Dewi Lestari' },
+            { code: 'SL-02', name: 'Budi Hermawan' },
+            { code: 'SL-03', name: 'Stephanus' },
+            { code: 'SL-04', name: 'Martha Papua' }
+          ];
+          localStorage.setItem('athree_sales_agents', JSON.stringify(seedSalesAgents));
+          await saveSalesAgentsToFirestore(seedSalesAgents);
+          window.dispatchEvent(new Event('athree-sales-agents-changed'));
 
           const storedPayments = localStorage.getItem('nota_stok_payment_transactions');
           let seedPayments: PaymentTransaction[] = [];
@@ -568,6 +596,24 @@ export default function App() {
     window.addEventListener('athree-invoices-changed', handleInvoicesSync);
     return () => {
       window.removeEventListener('athree-invoices-changed', handleInvoicesSync);
+    };
+  }, [firebaseStatus]);
+
+  useEffect(() => {
+    const handleSyncSalesToCloud = async () => {
+      try {
+        const storedSalesStr = localStorage.getItem('athree_sales_agents');
+        if (storedSalesStr && firebaseStatus === 'CONNECTED') {
+          const agents = JSON.parse(storedSalesStr);
+          await saveSalesAgentsToFirestore(agents);
+        }
+      } catch (e) {
+        console.error("Gagal sinkronisasi sales agents ke firestore:", e);
+      }
+    };
+    window.addEventListener('athree-sales-agents-changed', handleSyncSalesToCloud);
+    return () => {
+      window.removeEventListener('athree-sales-agents-changed', handleSyncSalesToCloud);
     };
   }, [firebaseStatus]);
 
@@ -1377,19 +1423,22 @@ export default function App() {
   };
 
   // Handle security credentials update
-  const handleUpdatePasswords = async (newKasirPass: string, newOwnerPass: string) => {
+  const handleUpdatePasswords = async (newKasirPass: string, newOwnerPass: string, newProduksiPass: string) => {
     try {
       setKasirPassword(newKasirPass);
       setOwnerPassword(newOwnerPass);
+      setProduksiPassword(newProduksiPass);
       
       localStorage.setItem('nota_stok_kasir_password', newKasirPass);
       localStorage.setItem('nota_stok_owner_password', newOwnerPass);
+      localStorage.setItem('nota_stok_produksi_password', newProduksiPass);
 
       // Save to Firebase
       await saveCredentialsToFirestore({
         id: 'credentials',
         kasirPassword: newKasirPass,
-        ownerPassword: newOwnerPass
+        ownerPassword: newOwnerPass,
+        produksiPassword: newProduksiPass
       });
 
       // Add audit log for security action
@@ -1399,7 +1448,7 @@ export default function App() {
         user: 'OWNER',
         actionType: 'UPDATE_PASSWORDS',
         module: 'SISTEM',
-        description: `Owner mengubah dan memutakhirkan kata sandi keamanan login (Akses Kasir & Owner).`,
+        description: `Owner mengubah dan memutakhirkan kata sandi keamanan login (Akses Kasir, Owner & Produksi).`,
         referenceNum: 'Mutasi Sandi'
       };
       
@@ -1526,6 +1575,7 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess} 
         kasirPassword={kasirPassword} 
         ownerPassword={ownerPassword} 
+        produksiPassword={produksiPassword}
       />
     );
   }
@@ -1902,6 +1952,7 @@ export default function App() {
               setTheme={setTheme}
               kasirPassword={kasirPassword}
               ownerPassword={ownerPassword}
+              produksiPassword={produksiPassword}
               onUpdatePasswords={handleUpdatePasswords}
               onResetStokBarang={handleResetStokBarang}
               onResetDaftarNota={handleResetDaftarNota}

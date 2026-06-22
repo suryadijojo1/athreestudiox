@@ -8,7 +8,7 @@ import {
   writeBatch,
   deleteDoc
 } from 'firebase/firestore';
-import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession } from '../types';
+import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession, SalesAgent } from '../types';
 
 // Load direct config from firebase-applet-config.json credentials
 const firebaseConfig = {
@@ -181,6 +181,7 @@ export interface SystemCredentials {
   id: string; // "credentials"
   kasirPassword?: string;
   ownerPassword?: string;
+  produksiPassword?: string;
 }
 
 export async function saveCredentialsToFirestore(creds: SystemCredentials): Promise<void> {
@@ -204,6 +205,7 @@ export async function loadCredentialsFromFirestore(): Promise<SystemCredentials 
           id: ds.id,
           kasirPassword: data.kasirPassword,
           ownerPassword: data.ownerPassword,
+          produksiPassword: data.produksiPassword,
         };
       }
     });
@@ -213,3 +215,32 @@ export async function loadCredentialsFromFirestore(): Promise<SystemCredentials 
     handleFirestoreError(error, OperationType.GET, 'metadata/credentials');
   }
 }
+
+export async function saveSalesAgentsToFirestore(agents: SalesAgent[]): Promise<void> {
+  try {
+    const docRef = doc(db, 'metadata', 'sales_agents');
+    await setDoc(docRef, cleanUndefined({ id: 'sales_agents', agents }));
+  } catch (error) {
+    console.error('Gagal simpan sales_agents ke Firebase:', error);
+    handleFirestoreError(error, OperationType.WRITE, 'metadata/sales_agents');
+  }
+}
+
+export async function loadSalesAgentsFromFirestore(): Promise<SalesAgent[] | null> {
+  try {
+    const docSnap = await getDocs(collection(db, 'metadata'));
+    let agents: SalesAgent[] | null = null;
+    docSnap.forEach((ds) => {
+      if (ds.id === 'sales_agents') {
+        const data = ds.data();
+        agents = data.agents || null;
+      }
+    });
+    return agents;
+  } catch (error) {
+    console.warn('Gagal memuat sales_agents dari Firebase:', error);
+    // Return null so we can fallback to defaults gracefully
+    return null;
+  }
+}
+

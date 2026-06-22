@@ -117,8 +117,20 @@
       "properties": {
         "activeSession": { "type": "object" },
         "kasirPassword": { "type": "string" },
-        "ownerPassword": { "type": "string" }
+        "ownerPassword": { "type": "string" },
+        "produksiPassword": { "type": "string" },
+        "agents": { "type": "array" }
       }
+    },
+    "SalesAgent": {
+      "title": "SalesAgent",
+      "description": "Store official sales agent information",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["code", "name"]
     }
   },
   "firestore": {
