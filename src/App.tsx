@@ -1927,7 +1927,12 @@ export default function App() {
         </aside>
 
         {/* Outer Workspace Shell Panel */}
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto print:p-0" id="app-workspace-main">
+        <main 
+          className={`flex-1 p-4 md:p-8 overflow-y-auto ${
+            (selectedInvoice || quickPrintInvoice) ? 'print:hidden' : 'print:p-0'
+          }`} 
+          id="app-workspace-main"
+        >
           
           {/* Dynamic tabs render switch routing */}
           {activeTab === 'dashboard' && (

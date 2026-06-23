@@ -9,6 +9,13 @@
     height: auto !important;
   }
 
+  #app-root-wrapper {
+    display: block !important;
+    background: transparent !important;
+    min-height: auto !important;
+    height: auto !important;
+  }
+
   /* Hide everything flagged print:hidden */
   aside, footer, nav, .print\:hidden, [id="btn-logout-sidebar"] {
     display: none !important;
