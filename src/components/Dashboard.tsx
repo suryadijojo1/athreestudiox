@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { Product, Invoice, AuditLog, CashierSession, PaymentTransaction } from '../types';
-import { TrendingUp, Wallet, Landmark, AlertTriangle, ArrowUpRight, ArrowDownRight, Package, Lock, Calendar, Clock, Printer, X, AlertCircle, Download, Database, ChevronDown, ChevronUp, Check, Settings, RefreshCw, Layers, CheckCircle2, Activity, Edit, Trash2, Coins, RotateCcw, Users } from 'lucide-react';
+import { TrendingUp, Wallet, Landmark, AlertTriangle, ArrowUpRight, ArrowDownRight, Package, Lock, Calendar, Clock, Printer, X, AlertCircle, Download, Database, ChevronDown, ChevronUp, Check, Settings, RefreshCw, Layers, CheckCircle2, Activity, Edit, Trash2, Coins, RotateCcw, Users, BookOpen } from 'lucide-react';
 import { motion } from 'motion/react';
 import { 
   ResponsiveContainer, 
@@ -622,11 +622,11 @@ export default function Dashboard({
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           
           {/* Left part: Today's Ledger table (3 cols) */}
-          <div className="lg:col-span-3 bg-white border-2 border-indigo-100 rounded-[2rem] p-6 shadow-md space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-indigo-50/50 pb-4">
+          <div className="lg:col-span-3 bg-white border-2 border-indigo-50 relative overflow-hidden shadow-sm space-y-4 rounded-[2rem] p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-indigo-50/80 pb-4">
               <div>
                 <h3 className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-indigo-500" />
+                  <BookOpen className="w-5 h-5 text-indigo-500" />
                   Buku Mutasi Hari Ini
                 </h3>
                 <p className="text-xs text-slate-400 font-semibold">
@@ -635,25 +635,25 @@ export default function Dashboard({
               </div>
 
               {/* Filter tabs */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-indigo-50 p-1 rounded-xl self-start sm:self-auto">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 p-1 rounded-xl self-start sm:self-auto">
                 <button 
                   type="button"
                   onClick={() => setMutationFilter('SEMUA')}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition ${mutationFilter === 'SEMUA' ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition ${mutationFilter === 'SEMUA' ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-750'}`}
                 >
                   Semua ({todayTransactions.length})
                 </button>
                 <button 
                   type="button"
                   onClick={() => setMutationFilter('MASUK')}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition ${mutationFilter === 'MASUK' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition ${mutationFilter === 'MASUK' ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-750'}`}
                 >
                   Masuk
                 </button>
                 <button 
                   type="button"
                   onClick={() => setMutationFilter('KELUAR')}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition ${mutationFilter === 'KELUAR' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition ${mutationFilter === 'KELUAR' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-750'}`}
                 >
                   Keluar
                 </button>
@@ -661,96 +661,137 @@ export default function Dashboard({
             </div>
 
             {/* Transactions list */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="border-b-2 border-indigo-100 text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50/40">
-                    <th className="px-3 py-3">Waktu</th>
-                    <th className="px-3 py-3">Transaksi / Sumber</th>
-                    <th className="px-3 py-3 text-center">Metode</th>
-                    <th className="px-3 py-3 text-right">Nominal</th>
-                    <th className="px-3 py-3 text-center">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-indigo-50 font-sans">
-                  {todayTransactions
-                    .filter(t => {
-                      if (mutationFilter === 'MASUK') return t.type !== 'PENGELUARAN';
-                      if (mutationFilter === 'KELUAR') return t.type === 'PENGELUARAN';
-                      return true;
-                    })
-                    .length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-12 text-center text-slate-400 font-bold">
-                          Belum ada mutasi tercatat hari ini.
-                        </td>
+            {(() => {
+              // Calculate rolling balance
+              const sortedTodayTx = [...todayTransactions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+              let currentBal = modalAwal;
+              
+              const mutationsWithBalance = sortedTodayTx.map((tx) => {
+                const isDebit = tx.type === 'PENGELUARAN';
+                const isTransfer = tx.method === 'TRANSFER';
+                
+                // Update rolling balance only for non-transfer transactions
+                if (!isTransfer) {
+                  if (isDebit) {
+                    currentBal -= tx.amount;
+                  } else {
+                    currentBal += tx.amount;
+                  }
+                }
+                
+                return {
+                  ...tx,
+                  isDebit,
+                  isTransfer,
+                  balance: currentBal
+                };
+              });
+
+              const filteredMutations = mutationsWithBalance.filter((mut) => {
+                if (mutationFilter === 'MASUK') return !mut.isDebit || mut.isTransfer;
+                if (mutationFilter === 'KELUAR') return mut.isDebit && !mut.isTransfer;
+                return true;
+              });
+
+              return (
+                <div className="overflow-x-auto select-text">
+                  <table className="w-full text-left border-collapse text-xs" id="dashboard-bank-ledger-replica-table">
+                    <thead>
+                      <tr className="bg-slate-50 border-b-2 border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="px-3 py-2.5 w-16">WAKTU</th>
+                        <th className="px-3 py-2.5">KETERANGAN</th>
+                        <th className="px-3 py-2.5 text-right w-40">MUTASI (CR/DB)</th>
+                        <th className="px-3 py-2.5 text-right w-40">TOTAL SALDO</th>
+                        <th className="px-3 py-2.5 text-center w-12 print:hidden">AKSI</th>
                       </tr>
-                    ) : (
-                      todayTransactions
-                        .filter(t => {
-                          if (mutationFilter === 'MASUK') return t.type !== 'PENGELUARAN';
-                          if (mutationFilter === 'KELUAR') return t.type === 'PENGELUARAN';
-                          return true;
-                        })
-                        .map((t) => {
-                          const dateObj = new Date(t.timestamp);
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {/* Initial Balance Row */}
+                      <tr className="bg-slate-50/50 border-b border-slate-100">
+                        <td className="px-3 py-2 font-mono text-[11px] font-bold text-slate-400">00:00</td>
+                        <td className="px-3 py-2 text-slate-400 italic uppercase font-semibold">SALDO AWAL SEBELUM TRANSAKSI</td>
+                        <td className="px-3 py-2 text-right text-slate-400">-</td>
+                        <td className="px-3 py-2 text-right font-mono text-[11px] font-bold text-slate-600">
+                          {modalAwal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-3 py-2 text-center print:hidden text-slate-400">-</td>
+                      </tr>
+
+                      {filteredMutations.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-8 text-center text-slate-400 italic font-semibold">
+                            Tidak ada mutasi kas harian yang cocok dengan filter ini.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredMutations.map((mut) => {
+                          const dateObj = new Date(mut.timestamp);
                           const timeStr = isNaN(dateObj.getTime()) ? '--:--' : dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-                          const isExpense = t.type === 'PENGELUARAN';
+                          
+                          // Format Description nicely
+                          let descText = mut.notes || (mut.isDebit ? 'Pengeluaran Manual' : 'Pemasukan');
+                          
                           return (
-                            <tr key={t.id} className="hover:bg-indigo-50/20 transition-colors">
-                              <td className="px-3 py-3 font-mono text-xs font-bold text-slate-400">
+                            <tr key={mut.id} className="hover:bg-slate-50/50 transition-colors border-b border-slate-100/50">
+                              {/* WAKTU */}
+                              <td className="px-3 py-2.5 font-mono text-[11px] font-bold text-slate-500 align-top">
                                 {timeStr}
                               </td>
-                              <td className="px-3 py-3">
+
+                              {/* Keterangan */}
+                              <td className="px-3 py-2.5 align-top">
                                 <div className="font-bold text-slate-800 leading-tight">
-                                  {t.notes || (isExpense ? 'Pengeluaran Manual' : 'Pemasukan')}
+                                  {descText}
                                 </div>
-                                {t.customerName && (
+                                {mut.customerName && (
                                   <div className="text-[10px] font-semibold text-slate-500 mt-0.5">
-                                    Pelanggan/Sumber: <strong className="text-indigo-650">{t.customerName}</strong>
+                                    Pelanggan/Sumber: <strong className="text-indigo-650">{mut.customerName}</strong>
                                   </div>
                                 )}
-                                {t.invoiceNum && (
+                                {mut.invoiceNum && (
                                   <div className="text-[10px] font-semibold text-indigo-500 mt-0.5">
-                                    Nota Ref: {t.invoiceNum}
+                                    Nota Ref: {mut.invoiceNum}
                                   </div>
                                 )}
-                                <div className="text-[9px] font-bold text-slate-400 mt-0.5">
-                                  Oleh: <strong className="text-slate-500 uppercase">{t.cashier || 'Sistem'}</strong>
+                                <div className="text-[9px] font-bold text-slate-400 mt-0.5 uppercase tracking-wide">
+                                  Oleh: {mut.cashier || 'Sistem'}
                                 </div>
                               </td>
-                              <td className="px-3 py-3 text-center">
-                                <span className={`inline-block px-2.5 py-0.5 text-[9px] font-black rounded-full uppercase tracking-wider ${t.method === 'CASH' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
-                                  {t.method === 'CASH' ? 'TUNAI' : 'TRANSFER'}
-                                </span>
+
+                              {/* MUTASI (CR/DB) */}
+                              <td className={`px-3 py-2.5 text-right font-mono text-[11px] font-bold align-top ${
+                                (mut.isDebit && !mut.isTransfer) ? 'text-rose-650' : 'text-emerald-650'
+                              }`}>
+                                {(mut.isDebit && !mut.isTransfer) ? '-' : '+'}{mut.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {(!mut.isDebit || mut.isTransfer) ? 'CR' : 'DB'}
                               </td>
-                              <td className={`px-3 py-3 text-right font-black font-mono text-xs ${isExpense ? 'text-rose-600' : 'text-emerald-650'}`}>
-                                {isExpense ? '-' : '+'}{formatRp(t.amount)}
+
+                              {/* TOTAL SALDO */}
+                              <td className="px-3 py-2.5 text-right font-mono text-[11px] font-bold align-top text-slate-700">
+                                {mut.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
-                              <td className="px-3 py-3 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
+
+                              {/* AKSI */}
+                              <td className="px-3 py-2.5 text-center align-top print:hidden">
+                                <div className="flex items-center justify-center gap-1">
                                   <button
-                                    onClick={() => handleStartEdit(t)}
+                                    onClick={() => handleStartEdit(mut)}
                                     title="Edit Mutasi"
                                     type="button"
-                                    className="p-1.5 text-indigo-600 hover:text-indigo-805 hover:bg-indigo-50 rounded-xl transition cursor-pointer border border-transparent hover:border-indigo-100"
+                                    className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition"
                                   >
-                                    <Edit className="w-3.5 h-3.5" />
+                                    <Edit className="w-3 h-3" />
                                   </button>
                                   {userRole === 'OWNER' ? (
                                     <button
-                                      onClick={() => handleDeleteMutationClick(t.id)}
-                                      title="Hapus Mutasi (Dapat dihapus oleh Owner)"
+                                      onClick={() => handleDeleteMutationClick(mut.id)}
+                                      title="Hapus"
                                       type="button"
-                                      className="p-1.5 text-rose-600 hover:text-rose-805 hover:bg-rose-50 rounded-xl transition cursor-pointer border border-transparent hover:border-rose-100"
+                                      className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition"
                                     >
-                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <Trash2 className="w-3 h-3" />
                                     </button>
                                   ) : (
-                                    <span 
-                                      className="p-1.5 text-slate-300 flex items-center justify-center cursor-not-allowed"
-                                      title="Hanya Owner yang dapat menghapus mutasi"
-                                    >
+                                    <span title="Hanya Owner" className="p-1 text-slate-300">
                                       <Lock className="w-3.5 h-3.5" />
                                     </span>
                                   )}
@@ -759,10 +800,12 @@ export default function Dashboard({
                             </tr>
                           );
                         })
-                    )}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Right part: Quick Entry Form (2 cols) */}

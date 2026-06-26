@@ -36,6 +36,7 @@ import LoginForm from './components/LoginForm';
 import HistoriAktivitas from './components/HistoriAktivitas';
 import PengaturanToko from './components/PengaturanToko';
 import KasirSesiPanel from './components/KasirSesiPanel';
+import BukuMutasi from './components/BukuMutasi';
 
 // Icon imports
 import { 
@@ -44,6 +45,7 @@ import {
   ShoppingCart, 
   Boxes, 
   LayoutDashboard, 
+  BookOpen, 
   Info,
   RotateCcw,
   Sparkles,
@@ -1816,6 +1818,22 @@ export default function App() {
                 Daftar Nota Pembayaran
               </button>
 
+              {/* Buku Mutasi Hari Ini */}
+              {userRole !== 'PRODUKSI' && (
+                <button
+                  id="tab-buku-mutasi"
+                  onClick={() => setActiveTab('buku-mutasi')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
+                    activeTab === 'buku-mutasi'
+                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-100'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-indigo-50/60'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  Buku Mutasi Hari Ini
+                </button>
+              )}
+
               {/* Rekap Kasir & Closingan */}
               {userRole !== 'PRODUKSI' && (
                 <button
@@ -2019,6 +2037,15 @@ export default function App() {
               onOpenSession={handleOpenSession}
               onCloseSession={handleCloseSession}
               onAddCustomTransaction={handleAddPaymentTransaction}
+              userRole={userRole}
+            />
+          )}
+
+          {activeTab === 'buku-mutasi' && (
+            <BukuMutasi
+              paymentTransactions={paymentTransactions}
+              onAddCustomTransaction={handleAddPaymentTransaction}
+              onDeleteCustomTransaction={handleDeletePaymentTransaction}
               userRole={userRole}
             />
           )}

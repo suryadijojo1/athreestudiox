@@ -249,6 +249,13 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     }
 
     return matchesSearch;
+  }).sort((a, b) => {
+    // Sort by date descending (newest date first)
+    const dateCompare = b.date.localeCompare(a.date);
+    if (dateCompare !== 0) return dateCompare;
+    
+    // If date is equal, sort by invoice number descending (so newest invoice first)
+    return b.invoiceNum.localeCompare(a.invoiceNum, undefined, { numeric: true, sensitivity: 'base' });
   });
 
   // Count due/overdue invoices

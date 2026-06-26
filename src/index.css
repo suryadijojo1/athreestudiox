@@ -21,6 +21,37 @@
     display: none !important;
   }
 
+  /* Bank mutation replica high-fidelity print overrides */
+  #bank-mutation-replica-frame {
+    background: white !important;
+    color: black !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  #bank-logo-header-stripe {
+    background: #5c6bc0 !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  #bank-ledger-replica-table th {
+    background: #e2ddd8 !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  #bank-ledger-replica-table tr {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  #bank-ledger-replica-table td {
+    color: black !important;
+  }
+
   /* Expand full receipt to utilize maximal printable area without grey cards */
   #detail-modal-overlay, #report-print-modal-overlay {
     background: transparent !important;
