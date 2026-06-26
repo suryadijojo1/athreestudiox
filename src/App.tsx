@@ -1113,6 +1113,47 @@ export default function App() {
     }
   };
 
+  const handleUpdateSessionOpeningBalance = async (newOpeningBalance: number) => {
+    if (!activeSession) return;
+    
+    const updatedSession: CashierSession = {
+      ...activeSession,
+      openingBalance: newOpeningBalance,
+      expectedCash: newOpeningBalance + (activeSession.expectedCash - activeSession.openingBalance)
+    };
+    
+    setActiveSession(updatedSession);
+    localStorage.setItem('nota_stok_active_session', JSON.stringify(updatedSession));
+    
+    // Audit Log for revised opening balance
+    const revLog: AuditLog = {
+      id: `log-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      user: 'OWNER',
+      actionType: 'RESET_SYSTEM',
+      module: 'SISTEM',
+      description: `Owner merevisi modal awal sesi kasir aktif menjadi Rp ${newOpeningBalance.toLocaleString('id-ID')}.`,
+      referenceNum: 'SESSION'
+    };
+    
+    const nextLogs = [revLog, ...auditLogs];
+    setAuditLogs(nextLogs);
+    localStorage.setItem('nota_stok_audit_logs', JSON.stringify(nextLogs));
+    
+    try {
+      setIsFirebaseSyncing(true);
+      await Promise.all([
+        saveActiveSessionToFirestore(updatedSession),
+        saveCollectionInBatches('audit_logs', nextLogs)
+      ]);
+      setFirebaseStatus('CONNECTED');
+    } catch (e) {
+      console.error("Gagal sinkronisasi update modal awal ke Firestore:", e);
+    } finally {
+      setIsFirebaseSyncing(false);
+    }
+  };
+
   const handleAddPaymentTransaction = async (tx: PaymentTransaction) => {
     const updated = [tx, ...paymentTransactions];
     setPaymentTransactions(updated);
@@ -1967,6 +2008,7 @@ export default function App() {
               onAddCustomTransaction={handleAddPaymentTransaction}
               onUpdateCustomTransaction={handleUpdatePaymentTransaction}
               onDeleteCustomTransaction={handleDeletePaymentTransaction}
+              onUpdateSessionOpeningBalance={handleUpdateSessionOpeningBalance}
             />
           )}
 
@@ -2038,6 +2080,7 @@ export default function App() {
               onCloseSession={handleCloseSession}
               onAddCustomTransaction={handleAddPaymentTransaction}
               userRole={userRole}
+              onUpdateSessionOpeningBalance={handleUpdateSessionOpeningBalance}
             />
           )}
 
@@ -2047,6 +2090,8 @@ export default function App() {
               onAddCustomTransaction={handleAddPaymentTransaction}
               onDeleteCustomTransaction={handleDeletePaymentTransaction}
               userRole={userRole}
+              activeSession={activeSession}
+              sessionsHistory={sessionsHistory}
             />
           )}
 

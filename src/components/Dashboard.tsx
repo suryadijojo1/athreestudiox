@@ -66,6 +66,7 @@ interface DashboardProps {
   onAddCustomTransaction?: (tx: PaymentTransaction) => void;
   onUpdateCustomTransaction?: (tx: PaymentTransaction) => void;
   onDeleteCustomTransaction?: (txId: string) => void;
+  onUpdateSessionOpeningBalance?: (newBalance: number) => void;
 }
 
 export default function Dashboard({ 
@@ -80,7 +81,8 @@ export default function Dashboard({
   paymentTransactions,
   onAddCustomTransaction,
   onUpdateCustomTransaction,
-  onDeleteCustomTransaction
+  onDeleteCustomTransaction,
+  onUpdateSessionOpeningBalance
 }: DashboardProps) {
   const [showReportModal, setShowReportModal] = React.useState(false);
   const [showPrintConfig, setShowPrintConfig] = React.useState(false);
@@ -97,6 +99,10 @@ export default function Dashboard({
   });
   const [showOtherSettings, setShowOtherSettings] = React.useState(false);
   const [isSimulatingPrint, setIsSimulatingPrint] = React.useState(false);
+
+  // States for revising opening balance on Dashboard
+  const [isEditingDashboardOpening, setIsEditingDashboardOpening] = React.useState(false);
+  const [revisedDashboardOpening, setRevisedDashboardOpening] = React.useState('');
 
   // States for daily cash flow mutation form in Cashier Dashboard view
   const [mutationType, setMutationType] = React.useState<'PEMASUKAN' | 'PENGELUARAN'>('PEMASUKAN');
@@ -448,8 +454,8 @@ export default function Dashboard({
 
   const modalAwal = React.useMemo(() => {
     const todayStrValue = new Date().toISOString().split('T')[0];
-    if (selectedMutationDate === todayStrValue && activeSession) {
-      return activeSession.openingBalance;
+    if (selectedMutationDate === todayStrValue) {
+      return activeSession ? activeSession.openingBalance : 0;
     }
     const matchedSession = sessions.find(s => {
       try {
@@ -478,7 +484,13 @@ export default function Dashboard({
   }, [todayTransactions]);
 
   const todayNetFlow = todayInflow - todayOutflow;
-  const saldoHariIni = modalAwal + todayInflow - todayOutflow;
+  const saldoHariIni = React.useMemo(() => {
+    const todayStrValue = new Date().toISOString().split('T')[0];
+    if (selectedMutationDate === todayStrValue) {
+      return activeSession ? (modalAwal + todayInflow - todayOutflow) : 0;
+    }
+    return modalAwal + todayInflow - todayOutflow;
+  }, [selectedMutationDate, activeSession, modalAwal, todayInflow, todayOutflow]);
 
   // Real-time Cash Flows from active session
   const currentSessionPayments = activeSession
@@ -569,13 +581,61 @@ export default function Dashboard({
         {/* Section Summary Row (Bento Grid 4 Cards) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* 1. Modal Awal */}
-          <div className="bg-white border-2 border-indigo-50 p-6 rounded-3xl shadow-sm flex items-center gap-4">
+          <div className="bg-white border-2 border-indigo-50 p-6 rounded-3xl shadow-sm flex items-center gap-4 relative">
             <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100 flex-shrink-0">
               <Coins className="w-6 h-6 stroke-[2.5]" />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Modal Awal Sesi</span>
-              <span className="text-xl font-black text-slate-800 font-mono mt-1 block">{formatRp(modalAwal)}</span>
+              {isEditingDashboardOpening ? (
+                <div className="mt-1 space-y-1">
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                    <input
+                      type="number"
+                      value={revisedDashboardOpening}
+                      onChange={(e) => setRevisedDashboardOpening(e.target.value)}
+                      className="w-full pl-8 pr-2 py-1 text-xs font-mono font-bold text-slate-800 bg-slate-50 border border-indigo-200 rounded-lg outline-none focus:border-indigo-500"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => {
+                        const val = parseFloat(revisedDashboardOpening);
+                        if (!isNaN(val) && val >= 0) {
+                          onUpdateSessionOpeningBalance?.(val);
+                          setIsEditingDashboardOpening(false);
+                        }
+                      }}
+                      className="flex-1 py-0.5 px-1.5 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded transition flex items-center justify-center gap-0.5"
+                    >
+                      <Check className="w-2.5 h-2.5" /> Simpan
+                    </button>
+                    <button
+                      onClick={() => setIsEditingDashboardOpening(false)}
+                      className="py-0.5 px-1.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition flex items-center justify-center"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-baseline justify-between mt-1">
+                  <span className="text-xl font-black text-slate-800 font-mono block truncate">{formatRp(modalAwal)}</span>
+                  {userRole === 'OWNER' && activeSession && (
+                    <button
+                      onClick={() => {
+                        setRevisedDashboardOpening(activeSession.openingBalance.toString());
+                        setIsEditingDashboardOpening(true);
+                      }}
+                      className="text-[10px] font-bold text-indigo-650 hover:underline flex items-center gap-0.5 ml-2 transition shrink-0"
+                    >
+                      <Edit className="w-3 h-3" /> Revisi
+                    </button>
+                  )}
+                </div>
+              )}
               <span className="text-[10px] font-semibold text-slate-400">Saldo awal buka kasir</span>
             </div>
           </div>

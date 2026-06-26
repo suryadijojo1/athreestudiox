@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PaymentTransaction, ShopSettings } from '../types';
+import { PaymentTransaction, ShopSettings, CashierSession } from '../types';
 import { 
   BookOpen, 
   Printer, 
@@ -21,6 +21,8 @@ interface BukuMutasiProps {
   onAddCustomTransaction: (tx: PaymentTransaction) => void;
   onDeleteCustomTransaction?: (txId: string) => void;
   userRole: string;
+  activeSession?: CashierSession | null;
+  sessionsHistory?: CashierSession[];
 }
 
 interface BankAccount {
@@ -34,7 +36,9 @@ export default function BukuMutasi({
   paymentTransactions,
   onAddCustomTransaction,
   onDeleteCustomTransaction,
-  userRole
+  userRole,
+  activeSession = null,
+  sessionsHistory = []
 }: BukuMutasiProps) {
   // Load registered bank accounts
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(() => {
@@ -70,6 +74,32 @@ export default function BukuMutasi({
     const saved = localStorage.getItem('athree_mutasi_starting_balance');
     return saved ? Number(saved) : 782890318;
   });
+
+  // Find session for start date to match cash drawer opening balance
+  const sessionForStartDate = useMemo(() => {
+    if (!startDate) return null;
+    const todayStrValue = new Date().toISOString().split('T')[0];
+    if (startDate === todayStrValue && activeSession) {
+      return activeSession;
+    }
+    const matchedSession = (sessionsHistory || []).find(s => {
+      try {
+        const openedDateStr = s.openedAt.split('T')[0];
+        return openedDateStr === startDate;
+      } catch (e) {
+        return false;
+      }
+    });
+    return matchedSession || null;
+  }, [activeSession, sessionsHistory, startDate]);
+
+  // Determine starting balance based on method selection (CASH uses opening balance, TRANSFER uses user-configured balance)
+  const effectiveStartingBalance = useMemo(() => {
+    if (selectedMethod === 'CASH') {
+      return sessionForStartDate ? sessionForStartDate.openingBalance : 0;
+    }
+    return startingBalance;
+  }, [selectedMethod, sessionForStartDate, startingBalance]);
 
   // Saving settings inside local storage
   useEffect(() => {
@@ -154,7 +184,7 @@ export default function BukuMutasi({
     });
 
     // Process each transaction to match the bank style layout
-    let currentBal = startingBalance;
+    let currentBal = effectiveStartingBalance;
     return sortedTx.map((tx, idx) => {
       const isDebit = tx.type === 'PENGELUARAN';
       const isTransfer = tx.method === 'TRANSFER';
@@ -205,7 +235,7 @@ export default function BukuMutasi({
         rawBalance: currentBal
       };
     });
-  }, [paymentTransactions, startDate, endDate, selectedMethod, startingBalance]);
+  }, [paymentTransactions, startDate, endDate, selectedMethod, effectiveStartingBalance]);
 
   // Handle form submission for manual mutation
   const handleSubmitManualMutation = (e: React.FormEvent) => {
@@ -444,11 +474,23 @@ export default function BukuMutasi({
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
               <input
                 type="number"
-                value={startingBalance}
-                onChange={(e) => setStartingBalance(Number(e.target.value))}
-                className="w-full bg-white border border-indigo-100 rounded-xl pl-9 pr-3.5 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-bold text-slate-700"
+                value={selectedMethod === 'CASH' ? effectiveStartingBalance : startingBalance}
+                onChange={(e) => {
+                  if (selectedMethod !== 'CASH') {
+                    setStartingBalance(Number(e.target.value));
+                  }
+                }}
+                disabled={selectedMethod === 'CASH'}
+                className={`w-full border border-indigo-100 rounded-xl pl-9 pr-3.5 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-bold text-slate-700 ${
+                  selectedMethod === 'CASH' ? 'bg-slate-50 cursor-not-allowed text-slate-400' : 'bg-white'
+                }`}
               />
             </div>
+            {selectedMethod === 'CASH' && (
+              <p className="text-[9px] text-slate-400 font-medium mt-1">
+                * Diambil otomatis dari modal awal sesi kasir harian.
+              </p>
+            )}
           </div>
 
           <div>
@@ -589,7 +631,7 @@ export default function BukuMutasi({
                 <td className="px-4 py-2 text-slate-400 italic">SALDO AWAL SEBELUM TRANSAKSI</td>
                 <td className="px-4 py-2 text-right text-slate-400">-</td>
                 <td className="px-4 py-2 text-right font-mono text-[11px] font-bold text-slate-700">
-                  {startingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {effectiveStartingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
                 <td className="px-3 py-2 print:hidden"></td>
               </tr>
@@ -656,7 +698,7 @@ export default function BukuMutasi({
             <p className="text-base font-black font-mono text-slate-800">
               {mutations.length > 0 
                 ? formatRp(mutations[mutations.length - 1].rawBalance)
-                : formatRp(startingBalance)
+                : formatRp(effectiveStartingBalance)
               }
             </p>
           </div>

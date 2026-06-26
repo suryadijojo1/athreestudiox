@@ -22,7 +22,10 @@ import {
   ArrowRight,
   Clock,
   HelpCircle,
-  PiggyBank
+  PiggyBank,
+  Edit,
+  Check,
+  X
 } from 'lucide-react';
 
 interface KasirSesiPanelProps {
@@ -33,6 +36,7 @@ interface KasirSesiPanelProps {
   onCloseSession: (actualCash: number, expectedCash: number, notes: string) => void;
   onAddCustomTransaction?: (tx: PaymentTransaction) => void;
   userRole: 'OWNER' | 'KASIR';
+  onUpdateSessionOpeningBalance?: (newBalance: number) => void;
 }
 
 export default function KasirSesiPanel({
@@ -42,7 +46,8 @@ export default function KasirSesiPanel({
   onOpenSession,
   onCloseSession,
   onAddCustomTransaction,
-  userRole
+  userRole,
+  onUpdateSessionOpeningBalance
 }: KasirSesiPanelProps) {
   
   const [panelTab, setPanelTab] = useState<'active' | 'history'>('active');
@@ -55,8 +60,12 @@ export default function KasirSesiPanel({
   const [txNotes, setTxNotes] = useState<string>('');
 
   // Opening form states
-  const [openingBalance, setOpeningBalance] = useState<number>(200000);
+  const [openingBalance, setOpeningBalance] = useState<number>(0);
   const [openByRole, setOpenByRole] = useState<'OWNER' | 'KASIR'>(userRole);
+
+  // States for revising opening balance
+  const [isEditingOpeningBal, setIsEditingOpeningBal] = useState<boolean>(false);
+  const [revisedOpeningBal, setRevisedOpeningBal] = useState<string>('');
 
   // Closing form states
   const [actualCash, setActualCash] = useState<number>(0);
@@ -268,7 +277,7 @@ export default function KasirSesiPanel({
                     className="w-full px-4 py-3 text-base bg-white dark:bg-slate-800 border bg-indigo-50/5 border-indigo-50 dark:border-slate-700 rounded-xl text-slate-800 dark:text-white outline-none focus:border-indigo-500 font-mono font-bold transition"
                   />
                   <p className="text-[10px] text-slate-400 mt-1 leading-normal font-medium">
-                    * Saldo kas tunai yang tersisa di laci uang dari hari sebelumnya sebagai modal kembalian.
+                    * Harap masukkan modal awal sesuai dengan uang fisik di laci saat ini. Setelah closing, saldo laci akan otomatis menjadi Rp 0.
                   </p>
                 </div>
 
@@ -332,9 +341,57 @@ export default function KasirSesiPanel({
                     <span className="text-[10px] font-bold text-indigo-505 uppercase tracking-widest block mb-2">
                       💵 Modal Awal (Cash)
                     </span>
-                    <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 font-mono tracking-tight mt-1">
-                      {formatRp(activeSession.openingBalance)}
-                    </h3>
+                    {isEditingOpeningBal ? (
+                      <div className="mt-1 space-y-2 relative z-10">
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                          <input
+                            type="number"
+                            value={revisedOpeningBal}
+                            onChange={(e) => setRevisedOpeningBal(e.target.value)}
+                            className="w-full pl-8 pr-2 py-1.5 text-sm font-mono font-bold text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 rounded-lg outline-none focus:border-indigo-500"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => {
+                              const val = parseFloat(revisedOpeningBal);
+                              if (!isNaN(val) && val >= 0) {
+                                onUpdateSessionOpeningBalance?.(val);
+                                setIsEditingOpeningBal(false);
+                              }
+                            }}
+                            className="flex-1 py-1 px-2 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition flex items-center justify-center gap-1"
+                          >
+                            <Check className="w-3 h-3" /> Simpan
+                          </button>
+                          <button
+                            onClick={() => setIsEditingOpeningBal(false)}
+                            className="py-1 px-2 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md transition flex items-center justify-center"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline justify-between mt-1 relative z-10">
+                        <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 font-mono tracking-tight">
+                          {formatRp(activeSession.openingBalance)}
+                        </h3>
+                        {userRole === 'OWNER' && (
+                          <button
+                            onClick={() => {
+                              setRevisedOpeningBal(activeSession.openingBalance.toString());
+                              setIsEditingOpeningBal(true);
+                            }}
+                            className="text-[10px] font-bold text-indigo-650 dark:text-indigo-400 hover:underline flex items-center gap-0.5 ml-2 transition shrink-0"
+                          >
+                            <Edit className="w-3 h-3" /> Revisi
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <p className="text-[10px] text-slate-400 font-medium mt-2 leading-relaxed">
                       Saldo cash pembukaan kas di laci keuangan.
                     </p>
