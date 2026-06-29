@@ -1805,10 +1805,10 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-indigo-50/70 font-sans text-slate-700 flex flex-col justify-between" id="app-root-wrapper">
+    <div className="min-h-screen bg-indigo-50/70 font-sans text-slate-700 flex flex-col justify-between max-w-full overflow-x-hidden" id="app-root-wrapper">
       
       {/* Container Layout with clean Navigation columns */}
-      <div className="flex-1 flex flex-col lg:flex-row">
+      <div className="flex-1 flex flex-col lg:flex-row max-w-full overflow-x-hidden">
         
         {/* Navigation Sidebar App Branding (Hides during printing) */}
         <aside className="w-full lg:w-64 bg-white border-b lg:border-r border-indigo-100 shrink-0 select-none flex flex-col justify-between print:hidden shadow-sm" id="app-navigation-sidebar">

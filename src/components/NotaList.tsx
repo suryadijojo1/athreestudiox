@@ -434,23 +434,23 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
 
       {/* Main Table Panel closely styled like the screenshot */}
       <div className="bg-white border-2 border-indigo-100 rounded-3xl overflow-hidden shadow-sm" id="invoices-main-table-card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse font-sans text-sm">
+        <div className="overflow-auto max-h-[650px]">
+          <table className="w-full text-left border-collapse font-sans text-[11px] md:text-xs lg:text-[13px]">
             <thead>
-              <tr className="border-b-2 border-indigo-150 bg-indigo-50/55 text-xs font-black uppercase tracking-wider text-indigo-700">
-                <th className="px-5 py-4">No.</th>
-                <th className="px-5 py-4">No. Nota</th>
-                <th className="px-5 py-4">Tanggal</th>
-                <th className="px-5 py-4">Deadline</th>
-                <th className="px-5 py-4">Nama Pemesan / Tim</th>
-                <th className="px-5 py-4 text-center">Total Qty</th>
-                <th className="px-5 py-4 text-right">Total Tagihan</th>
-                <th className="px-5 py-4 text-right">DP (Masuk)</th>
-                <th className="px-5 py-4 text-right">Pelunasan</th>
-                <th className="px-5 py-4 text-right">Sisa Piutang</th>
-                <th className="px-5 py-4 text-center">Status Bayar</th>
-                <th className="px-5 py-4 text-center">Status Produksi</th>
-                <th className="px-5 py-4 text-right">Aksi</th>
+              <tr className="bg-indigo-50 text-[10px] md:text-xs font-black uppercase tracking-wider text-indigo-700">
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3">No.</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3">No. Nota</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3">Tanggal</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3">Deadline</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3">Nama Pemesan / Tim</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3 text-center">Total Qty</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3 text-right">Total Tagihan</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3 text-right">DP (Masuk)</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3 text-right">Pelunasan</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3 text-right">Sisa Piutang</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3 text-center">Status Bayar</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3 text-center">Status Produksi</th>
+                <th className="sticky top-0 z-10 bg-indigo-50 border-b-2 border-indigo-150 px-2 py-3 lg:px-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-indigo-50 text-slate-650">
@@ -468,27 +468,27 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                     onClick={() => onSelectInvoice(inv)}
                   >
                     {/* Index */}
-                    <td className="px-5 py-4 text-slate-400 font-mono text-xs font-bold">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-slate-400 font-mono text-xs font-bold">
                       {idx + 1}
                     </td>
 
                     {/* No Nota */}
-                    <td className="px-5 py-4 font-mono font-black text-indigo-600 group-hover:text-indigo-500">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 font-mono font-black text-indigo-600 group-hover:text-indigo-500">
                       {inv.invoiceNum}
                     </td>
 
                     {/* Tanggal */}
-                    <td className="px-5 py-4 whitespace-nowrap text-slate-500 font-semibold">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 whitespace-nowrap text-slate-500 font-semibold">
                       {formatDateShort(inv.date)}
                     </td>
 
                     {/* Deadline */}
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 whitespace-nowrap">
                       {getDeadlineBadge(inv.deadlineDate, inv.productionStatus)}
                     </td>
 
                     {/* Customer */}
-                    <td className="px-5 py-4 max-w-[180px]">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 max-w-[180px]">
                       <div className="font-bold text-slate-800 truncate" title={inv.customerName}>
                         {inv.customerName}
                       </div>
@@ -505,27 +505,27 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                     </td>
 
                     {/* Total Qty */}
-                    <td className="px-5 py-4 text-center font-mono font-bold text-indigo-600">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-center font-mono font-bold text-indigo-600">
                       {inv.totalQty} <span className="text-[10px] text-slate-400 font-medium font-sans">pcs</span>
                     </td>
 
                     {/* Total Tagihan */}
-                    <td className="px-5 py-4 text-right font-mono font-black text-slate-800">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-right font-mono font-black text-slate-800">
                       {formatRp(inv.totalAmount)}
                     </td>
 
                     {/* DP */}
-                    <td className="px-5 py-4 text-right font-mono font-bold text-slate-705">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-right font-mono font-bold text-slate-705">
                       {formatRp(inv.downPayment)}
                     </td>
 
                     {/* Pelunasan */}
-                    <td className="px-5 py-4 text-right font-mono font-bold text-slate-705">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-right font-mono font-bold text-slate-705">
                       {formatRp(inv.settlement)}
                     </td>
 
                     {/* Sisa Piutang */}
-                    <td className="px-5 py-4 text-right font-mono font-black">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-right font-mono font-black">
                       {inv.remainingDebt > 0 ? (
                         <span className="text-amber-600">{formatRp(inv.remainingDebt)}</span>
                       ) : (
@@ -534,8 +534,8 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                     </td>
 
                     {/* Status Bayar */}
-                    <td className="px-5 py-4 text-center">
-                      <span className={`inline-block px-3.5 py-1 text-xs font-black rounded-full ${
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-center">
+                      <span className={`inline-block px-2.5 py-0.5 text-[10px] md:text-xs font-black rounded-full ${
                         inv.status === 'LUNAS' 
                           ? 'bg-green-100 text-green-700' 
                           : inv.status === 'DP' 
@@ -547,12 +547,12 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                     </td>
 
                     {/* Status Produksi */}
-                    <td className="px-5 py-4 text-center whitespace-nowrap animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-center whitespace-nowrap animate-fade-in" onClick={(e) => e.stopPropagation()}>
                       <select
                         id={`select-prod-status-${inv.id}`}
                         value={inv.productionStatus || 'ANTREAN'}
                         onChange={(e) => onUpdateProductionStatus(inv.id, e.target.value as any)}
-                        className={`px-3 py-1.5 text-xs font-black rounded-2xl border-2 cursor-pointer outline-none transition duration-150 ${
+                        className={`px-2 py-1 text-[11px] font-black rounded-xl border-2 cursor-pointer outline-none transition duration-150 ${
                           (inv.productionStatus || 'ANTREAN') === 'ANTREAN'
                             ? 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                             : (inv.productionStatus || 'ANTREAN') === 'DESAIN'
@@ -589,8 +589,8 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                     </td>
 
                     {/* Actions */}
-                    <td className="px-5 py-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end gap-1.5">
+                    <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1">
                         
                         {/* Record partial payment / pelunasan button */}
                         {inv.remainingDebt > 0 && userRole !== 'PRODUKSI' && (
@@ -598,22 +598,22 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                             id={`btn-settle-${inv.id}`}
                             onClick={(e) => handleOpenSettle(e, inv)}
                             title="Proses Pelunasan Piutang"
-                            className="p-1.5 bg-indigo-50 hover:bg-indigo-500 hover:text-white text-indigo-600 rounded-xl transition flex items-center gap-1 text-xs font-black border-none cursor-pointer"
+                            className="p-1 lg:p-1.5 bg-indigo-50 hover:bg-indigo-500 hover:text-white text-indigo-600 rounded-lg transition flex items-center gap-0.5 text-[10px] md:text-xs font-black border-none cursor-pointer"
                           >
-                            <CircleDollarSign className="w-3.5 h-3.5" />
-                            Pelunasan
+                            <CircleDollarSign className="w-3 h-3" />
+                            Bayar
                           </button>
                         )}
 
                         {onEditInvoice && userRole !== 'PRODUKSI' && (
                           <button
                             id={`btn-edit-${inv.id}`}
-                            onClick={() => onEditInvoice(inv)}
+                             onClick={() => onEditInvoice(inv)}
                             title="Edit / Revisi Rincian Nota"
-                            className="p-1.5 bg-amber-50 hover:bg-amber-500 hover:text-white text-amber-600 rounded-xl transition flex items-center gap-1 text-xs font-black border-none cursor-pointer"
+                            className="p-1 lg:p-1.5 bg-amber-50 hover:bg-amber-500 hover:text-white text-amber-600 rounded-lg transition flex items-center gap-0.5 text-[10px] md:text-xs font-black border-none cursor-pointer"
                           >
-                            <Edit className="w-3.5 h-3.5" />
-                            Revisi
+                            <Edit className="w-3 h-3" />
+                            Edit
                           </button>
                         )}
 
@@ -622,10 +622,10 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                             id={`btn-quick-print-${inv.id}`}
                             onClick={() => onQuickPrint(inv)}
                             title="Cetak Cepat Nota"
-                            className="p-1.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl transition flex items-center gap-1 text-xs font-black border-none cursor-pointer shadow-xs active:scale-95"
+                            className="p-1 lg:p-1.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg transition flex items-center gap-0.5 text-[10px] md:text-xs font-black border-none cursor-pointer shadow-xs active:scale-95"
                           >
-                            <Printer className="w-3.5 h-3.5" />
-                            Cetak Cepat
+                            <Printer className="w-3 h-3" />
+                            Cetak
                           </button>
                         )}
 
@@ -637,9 +637,9 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                               setDeleteInvoiceId(inv.id);
                             }}
                             title="Hapus Nota Permanen"
-                            className="p-1.5 bg-rose-50 hover:bg-rose-550 hover:text-white text-rose-600 rounded-xl transition flex items-center gap-1 text-xs font-black border-none cursor-pointer active:scale-95 duration-100"
+                            className="p-1 lg:p-1.5 bg-rose-50 hover:bg-rose-550 hover:text-white text-rose-600 rounded-lg transition flex items-center gap-0.5 text-[10px] md:text-xs font-black border-none cursor-pointer active:scale-95 duration-100"
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-rose-600 group-hover:text-white" />
+                            <Trash2 className="w-3 h-3 text-rose-600 group-hover:text-white" />
                             Hapus
                           </button>
                         )}
@@ -648,9 +648,9 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                           id={`btn-view-${inv.id}`}
                           onClick={() => onSelectInvoice(inv)}
                           title="Cetak/Lihat Invoice"
-                          className="p-1.5 bg-slate-50 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-xl transition flex items-center gap-1 text-xs font-black border-none cursor-pointer"
+                          className="p-1 lg:p-1.5 bg-slate-50 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-lg transition flex items-center gap-0.5 text-[10px] md:text-xs font-black border-none cursor-pointer"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3 h-3" />
                           Detail
                         </button>
                       </div>
