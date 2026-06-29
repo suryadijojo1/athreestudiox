@@ -592,9 +592,16 @@ export default function Dashboard({
                   <div className="relative">
                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
                     <input
-                      type="number"
+                      type="text"
                       value={revisedDashboardOpening}
-                      onChange={(e) => setRevisedDashboardOpening(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val) {
+                          setRevisedDashboardOpening(parseInt(val, 10).toLocaleString('id-ID'));
+                        } else {
+                          setRevisedDashboardOpening('');
+                        }
+                      }}
                       className="w-full pl-8 pr-2 py-1 text-xs font-mono font-bold text-slate-800 bg-slate-50 border border-indigo-200 rounded-lg outline-none focus:border-indigo-500"
                       autoFocus
                     />
@@ -602,7 +609,7 @@ export default function Dashboard({
                   <div className="flex gap-1">
                     <button
                       onClick={() => {
-                        const val = parseFloat(revisedDashboardOpening);
+                        const val = parseFloat(revisedDashboardOpening.replace(/[^0-9]/g, ''));
                         if (!isNaN(val) && val >= 0) {
                           onUpdateSessionOpeningBalance?.(val);
                           setIsEditingDashboardOpening(false);
@@ -626,7 +633,7 @@ export default function Dashboard({
                   {userRole === 'OWNER' && activeSession && (
                     <button
                       onClick={() => {
-                        setRevisedDashboardOpening(activeSession.openingBalance.toString());
+                        setRevisedDashboardOpening(activeSession.openingBalance.toLocaleString('id-ID'));
                         setIsEditingDashboardOpening(true);
                       }}
                       className="text-[10px] font-bold text-indigo-650 hover:underline flex items-center gap-0.5 ml-2 transition shrink-0"
@@ -833,23 +840,25 @@ export default function Dashboard({
                               {/* AKSI */}
                               <td className="px-3 py-2.5 text-center align-top print:hidden">
                                 <div className="flex items-center justify-center gap-1">
-                                  <button
-                                    onClick={() => handleStartEdit(mut)}
-                                    title="Edit Mutasi"
-                                    type="button"
-                                    className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition"
-                                  >
-                                    <Edit className="w-3 h-3" />
-                                  </button>
                                   {userRole === 'OWNER' ? (
-                                    <button
-                                      onClick={() => handleDeleteMutationClick(mut.id)}
-                                      title="Hapus"
-                                      type="button"
-                                      className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
+                                    <>
+                                      <button
+                                        onClick={() => handleStartEdit(mut)}
+                                        title="Edit Mutasi"
+                                        type="button"
+                                        className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition"
+                                      >
+                                        <Edit className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteMutationClick(mut.id)}
+                                        title="Hapus"
+                                        type="button"
+                                        className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </>
                                   ) : (
                                     <span title="Hanya Owner" className="p-1 text-slate-300">
                                       <Lock className="w-3.5 h-3.5" />

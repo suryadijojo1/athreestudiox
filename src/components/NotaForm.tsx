@@ -679,13 +679,15 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
                   Harga Satuan (Rp)
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   id="input-custom-price"
-                  min="0"
-                  value={customPrice}
-                  onChange={(e) => setCustomPrice(Number(e.target.value))}
+                  value={customPrice === 0 ? '' : customPrice.toLocaleString('id-ID')}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    setCustomPrice(val ? parseInt(val, 10) : 0);
+                  }}
                   placeholder="Harga"
-                  className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 focus:bg-white border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none rounded-2xl text-slate-800 outline-none transition"
+                  className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 focus:bg-white border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none rounded-2xl text-slate-800 outline-none transition font-mono font-bold"
                 />
               </div>
 
@@ -816,13 +818,15 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
                 DP (Pembayaran Uang Muka) (Rp)
               </label>
               <input
-                type="number"
+                type="text"
                 id="input-dp-amount"
-                min="0"
-                max={totalAmount}
-                value={downPayment || ''}
-                onChange={(e) => setDownPayment(Number(e.target.value))}
-                placeholder="Contoh: 1500000"
+                value={downPayment === 0 ? '' : downPayment.toLocaleString('id-ID')}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  const numVal = val ? parseInt(val, 10) : 0;
+                  setDownPayment(Math.min(totalAmount, numVal));
+                }}
+                placeholder="Contoh: 1.500.000"
                 className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none rounded-2xl text-slate-800 font-mono font-bold transition"
               />
               <div className="flex justify-between text-[11px] text-slate-400 font-bold pt-1">

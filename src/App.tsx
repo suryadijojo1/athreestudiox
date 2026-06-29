@@ -1154,6 +1154,39 @@ export default function App() {
     }
   };
 
+  const handleUpdateSessionHistory = async (updatedSess: CashierSession) => {
+    const updated = sessionsHistory.map(s => s.id === updatedSess.id ? updatedSess : s);
+    setSessionsHistory(updated);
+    localStorage.setItem('nota_stok_sessions_history', JSON.stringify(updated));
+
+    // Audit Log
+    const revLog: AuditLog = {
+      id: `log-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      user: 'OWNER',
+      actionType: 'RESET_SYSTEM',
+      module: 'SISTEM',
+      description: `Owner merevisi riwayat laci kasir (Sesi ID: ${updatedSess.id}). Modal Baru: Rp ${updatedSess.openingBalance.toLocaleString('id-ID')}. Uang Fisik Baru: Rp ${(updatedSess.actualCash ?? 0).toLocaleString('id-ID')}.`,
+      referenceNum: 'SESSION'
+    };
+    const nextLogs = [revLog, ...auditLogs];
+    setAuditLogs(nextLogs);
+    localStorage.setItem('nota_stok_audit_logs', JSON.stringify(nextLogs));
+
+    try {
+      setIsFirebaseSyncing(true);
+      await Promise.all([
+        saveCollectionInBatches('sessions_history', updated),
+        saveCollectionInBatches('audit_logs', nextLogs)
+      ]);
+      setFirebaseStatus('CONNECTED');
+    } catch (e) {
+      console.error("Gagal sinkronisasi update riwayat sesi ke Firestore:", e);
+    } finally {
+      setIsFirebaseSyncing(false);
+    }
+  };
+
   const handleAddPaymentTransaction = async (tx: PaymentTransaction) => {
     const updated = [tx, ...paymentTransactions];
     setPaymentTransactions(updated);
@@ -1197,8 +1230,45 @@ export default function App() {
       referenceNum: updatedTx.invoiceNum || 'MUTASI'
     };
     const nextLogs = [editLog, ...auditLogs];
-    setAuditLogs(nextLogs);
-    localStorage.setItem('nota_stok_audit_logs', JSON.stringify(nextLogs));
+
+    let nextInvoices = [...invoices];
+    if (updatedTx.invoiceId) {
+      nextInvoices = invoices.map(inv => {
+        if (inv.id === updatedTx.invoiceId) {
+          const invoiceTxs = updated.filter(tx => tx.invoiceId === inv.id);
+          const totalDP = invoiceTxs.filter(tx => tx.type === 'DP').reduce((sum, tx) => sum + tx.amount, 0);
+          const totalSettle = invoiceTxs.filter(tx => tx.type === 'PELUNASAN').reduce((sum, tx) => sum + tx.amount, 0);
+          const totalPaid = totalDP + totalSettle;
+          const nextRemaining = Math.max(0, inv.totalAmount - totalPaid);
+          
+          let nextStatus: 'BELUM_BAYAR' | 'DP' | 'LUNAS' = inv.status;
+          let nextLabel = inv.customStatusLabel;
+          if (nextRemaining === 0) {
+            nextStatus = 'LUNAS';
+            nextLabel = 'LUNAS';
+          } else if (totalPaid > 0) {
+            const percentage = Math.round((totalPaid / inv.totalAmount) * 100);
+            nextStatus = 'DP';
+            nextLabel = `DP ${percentage}%`;
+          } else {
+            nextStatus = 'BELUM_BAYAR';
+            nextLabel = undefined;
+          }
+
+          return {
+            ...inv,
+            downPayment: totalDP,
+            settlement: totalSettle,
+            remainingDebt: nextRemaining,
+            status: nextStatus,
+            customStatusLabel: nextLabel
+          };
+        }
+        return inv;
+      });
+    }
+
+    syncToLocalStorage(products, nextInvoices, movements, nextLogs);
 
     try {
       await saveDocumentToFirestore('payment_transactions', updatedTx);
@@ -1227,8 +1297,45 @@ export default function App() {
       referenceNum: txToDelete.invoiceNum || 'MUTASI'
     };
     const nextLogs = [deleteLog, ...auditLogs];
-    setAuditLogs(nextLogs);
-    localStorage.setItem('nota_stok_audit_logs', JSON.stringify(nextLogs));
+
+    let nextInvoices = [...invoices];
+    if (txToDelete.invoiceId) {
+      nextInvoices = invoices.map(inv => {
+        if (inv.id === txToDelete.invoiceId) {
+          const invoiceTxs = updated.filter(tx => tx.invoiceId === inv.id);
+          const totalDP = invoiceTxs.filter(tx => tx.type === 'DP').reduce((sum, tx) => sum + tx.amount, 0);
+          const totalSettle = invoiceTxs.filter(tx => tx.type === 'PELUNASAN').reduce((sum, tx) => sum + tx.amount, 0);
+          const totalPaid = totalDP + totalSettle;
+          const nextRemaining = Math.max(0, inv.totalAmount - totalPaid);
+          
+          let nextStatus: 'BELUM_BAYAR' | 'DP' | 'LUNAS' = inv.status;
+          let nextLabel = inv.customStatusLabel;
+          if (nextRemaining === 0) {
+            nextStatus = 'LUNAS';
+            nextLabel = 'LUNAS';
+          } else if (totalPaid > 0) {
+            const percentage = Math.round((totalPaid / inv.totalAmount) * 100);
+            nextStatus = 'DP';
+            nextLabel = `DP ${percentage}%`;
+          } else {
+            nextStatus = 'BELUM_BAYAR';
+            nextLabel = undefined;
+          }
+
+          return {
+            ...inv,
+            downPayment: totalDP,
+            settlement: totalSettle,
+            remainingDebt: nextRemaining,
+            status: nextStatus,
+            customStatusLabel: nextLabel
+          };
+        }
+        return inv;
+      });
+    }
+
+    syncToLocalStorage(products, nextInvoices, movements, nextLogs);
 
     try {
       await deleteDocumentFromFirestore('payment_transactions', txId);
@@ -2079,8 +2186,11 @@ export default function App() {
               onOpenSession={handleOpenSession}
               onCloseSession={handleCloseSession}
               onAddCustomTransaction={handleAddPaymentTransaction}
+              onUpdateCustomTransaction={handleUpdatePaymentTransaction}
+              onDeleteCustomTransaction={handleDeletePaymentTransaction}
               userRole={userRole}
               onUpdateSessionOpeningBalance={handleUpdateSessionOpeningBalance}
+              onUpdateSessionHistory={handleUpdateSessionHistory}
             />
           )}
 
@@ -2088,6 +2198,7 @@ export default function App() {
             <BukuMutasi
               paymentTransactions={paymentTransactions}
               onAddCustomTransaction={handleAddPaymentTransaction}
+              onUpdateCustomTransaction={handleUpdatePaymentTransaction}
               onDeleteCustomTransaction={handleDeletePaymentTransaction}
               userRole={userRole}
               activeSession={activeSession}

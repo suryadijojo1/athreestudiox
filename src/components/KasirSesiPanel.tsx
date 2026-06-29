@@ -25,7 +25,8 @@ import {
   PiggyBank,
   Edit,
   Check,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 interface KasirSesiPanelProps {
@@ -35,8 +36,11 @@ interface KasirSesiPanelProps {
   onOpenSession: (openingBalance: number, cashier: 'OWNER' | 'KASIR') => void;
   onCloseSession: (actualCash: number, expectedCash: number, notes: string) => void;
   onAddCustomTransaction?: (tx: PaymentTransaction) => void;
+  onUpdateCustomTransaction?: (tx: PaymentTransaction) => void;
+  onDeleteCustomTransaction?: (txId: string) => void;
   userRole: 'OWNER' | 'KASIR';
   onUpdateSessionOpeningBalance?: (newBalance: number) => void;
+  onUpdateSessionHistory?: (sess: CashierSession) => void;
 }
 
 export default function KasirSesiPanel({
@@ -46,8 +50,11 @@ export default function KasirSesiPanel({
   onOpenSession,
   onCloseSession,
   onAddCustomTransaction,
+  onUpdateCustomTransaction,
+  onDeleteCustomTransaction,
   userRole,
-  onUpdateSessionOpeningBalance
+  onUpdateSessionOpeningBalance,
+  onUpdateSessionHistory
 }: KasirSesiPanelProps) {
   
   const [panelTab, setPanelTab] = useState<'active' | 'history'>('active');
@@ -74,6 +81,110 @@ export default function KasirSesiPanel({
 
   // Filter history
   const [searchHistory, setSearchHistory] = useState<string>('');
+
+  // Editing transaction state for Owner
+  const [editingTransaction, setEditingTransaction] = useState<PaymentTransaction | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editCustomer, setEditCustomer] = useState('');
+  const [editMethod, setEditMethod] = useState<'CASH' | 'TRANSFER'>('CASH');
+  const [editType, setEditType] = useState<'DP' | 'PELUNASAN' | 'PENGELUARAN'>('PELUNASAN');
+  const [editTimestamp, setEditTimestamp] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const handleStartEdit = (tx: PaymentTransaction) => {
+    setEditingTransaction(tx);
+    setEditAmount(tx.amount.toLocaleString('id-ID'));
+    setEditNotes(tx.notes || '');
+    setEditCustomer(tx.customerName || '');
+    setEditMethod(tx.method);
+    setEditType(tx.type);
+    setEditTimestamp(tx.timestamp);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction) return;
+
+    const parsedAmount = parseFloat(editAmount.replace(/[^0-9]/g, ''));
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      alert("Harap masukkan nominal transaksi mutasi yang valid!");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      const updatedTx: PaymentTransaction = {
+        ...editingTransaction,
+        amount: parsedAmount,
+        method: editMethod,
+        type: editType,
+        notes: editNotes.trim(),
+        customerName: editCustomer.trim() ? editCustomer.trim() : undefined,
+        timestamp: editTimestamp || new Date().toISOString()
+      };
+
+      if (onUpdateCustomTransaction) {
+        await onUpdateCustomTransaction(updatedTx);
+      }
+      setEditingTransaction(null);
+    } catch (err) {
+      console.error("Gagal mengubah transaksi:", err);
+      alert("Gagal menyimpan perubahan transaksi!");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteTransactionClick = (id: string) => {
+    if (window.confirm("Apakah Anda yakin ingin menghapus transaksi ini?")) {
+      onDeleteCustomTransaction?.(id);
+    }
+  };
+
+  // Editing closed session history state
+  const [editingSession, setEditingSession] = useState<CashierSession | null>(null);
+  const [editSessionOpening, setEditSessionOpening] = useState('');
+  const [editSessionActual, setEditSessionActual] = useState('');
+  const [editSessionNotes, setEditSessionNotes] = useState('');
+
+  const handleStartEditSession = (sess: CashierSession) => {
+    setEditingSession(sess);
+    setEditSessionOpening(sess.openingBalance.toLocaleString('id-ID'));
+    setEditSessionActual((sess.actualCash ?? 0).toLocaleString('id-ID'));
+    setEditSessionNotes(sess.notes || '');
+  };
+
+  const handleSaveEditSession = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSession) return;
+
+    const opening = parseFloat(editSessionOpening.replace(/[^0-9]/g, ''));
+    const actual = parseFloat(editSessionActual.replace(/[^0-9]/g, ''));
+    if (isNaN(opening) || opening < 0) {
+      alert("Harap masukkan modal awal yang valid!");
+      return;
+    }
+    if (isNaN(actual) || actual < 0) {
+      alert("Harap masukkan uang fisik yang valid!");
+      return;
+    }
+
+    // Recalculate discrepancy
+    const discrepancy = actual - (opening + (editingSession.expectedCash - editingSession.openingBalance));
+
+    const updatedSess: CashierSession = {
+      ...editingSession,
+      openingBalance: opening,
+      actualCash: actual,
+      expectedCash: opening + (editingSession.expectedCash - editingSession.openingBalance),
+      discrepancy: discrepancy,
+      notes: editSessionNotes.trim(),
+    };
+
+    onUpdateSessionHistory?.(updatedSess);
+    setEditingSession(null);
+  };
 
   const formatRp = (value: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -264,15 +375,16 @@ export default function KasirSesiPanel({
                     💵 Modal Awal Laci Kasir (Rp)
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     id="opening-balance"
                     required
-                    min="0"
-                    placeholder="Contoh: 200000"
-                    value={openingBalance}
+                    placeholder="Contoh: 200.000"
+                    value={openingBalance === 0 ? '' : openingBalance.toLocaleString('id-ID')}
                     onChange={(e) => {
-                      setOpeningBalance(Number(e.target.value));
-                      setActualCash(Number(e.target.value));
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      const numVal = val ? parseInt(val, 10) : 0;
+                      setOpeningBalance(numVal);
+                      setActualCash(numVal);
                     }}
                     className="w-full px-4 py-3 text-base bg-white dark:bg-slate-800 border bg-indigo-50/5 border-indigo-50 dark:border-slate-700 rounded-xl text-slate-800 dark:text-white outline-none focus:border-indigo-500 font-mono font-bold transition"
                   />
@@ -346,9 +458,16 @@ export default function KasirSesiPanel({
                         <div className="relative">
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
                           <input
-                            type="number"
+                            type="text"
                             value={revisedOpeningBal}
-                            onChange={(e) => setRevisedOpeningBal(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9]/g, '');
+                              if (val) {
+                                setRevisedOpeningBal(parseInt(val, 10).toLocaleString('id-ID'));
+                              } else {
+                                setRevisedOpeningBal('');
+                              }
+                            }}
                             className="w-full pl-8 pr-2 py-1.5 text-sm font-mono font-bold text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 rounded-lg outline-none focus:border-indigo-500"
                             autoFocus
                           />
@@ -356,7 +475,7 @@ export default function KasirSesiPanel({
                         <div className="flex gap-1.5">
                           <button
                             onClick={() => {
-                              const val = parseFloat(revisedOpeningBal);
+                              const val = parseFloat(revisedOpeningBal.replace(/[^0-9]/g, ''));
                               if (!isNaN(val) && val >= 0) {
                                 onUpdateSessionOpeningBalance?.(val);
                                 setIsEditingOpeningBal(false);
@@ -492,13 +611,15 @@ export default function KasirSesiPanel({
                         <div>
                           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nominal (Rp)</label>
                           <input
-                            type="number"
+                            type="text"
                             required
-                            min="1"
-                            value={txAmount || ''}
-                            onChange={(e) => setTxAmount(Number(e.target.value))}
+                            value={txAmount === 0 ? '' : txAmount.toLocaleString('id-ID')}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9]/g, '');
+                              setTxAmount(val ? parseInt(val, 10) : 0);
+                            }}
                             className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-indigo-50/50 dark:border-slate-700 rounded-xl outline-none font-mono font-bold"
-                            placeholder="Contoh: 15000"
+                            placeholder="Contoh: 15.000"
                           />
                         </div>
                         <div>
@@ -572,6 +693,7 @@ export default function KasirSesiPanel({
                             <th className="py-2.5 font-bold">Tipe</th>
                             <th className="py-2.5 text-center">Metode</th>
                             <th className="py-2.5 text-right">Jumlah</th>
+                            <th className="py-2.5 text-center print:hidden">Aksi</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-indigo-50/30">
@@ -612,6 +734,32 @@ export default function KasirSesiPanel({
                               <td className={`py-2.5 text-right font-mono font-bold ${
                                 p.type === 'PENGELUARAN' ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-100'
                               }`}>{p.type === 'PENGELUARAN' ? '-' : ''}{formatRp(p.amount)}</td>
+                              <td className="py-2.5 text-center print:hidden">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {userRole === 'OWNER' ? (
+                                    <>
+                                      <button
+                                        onClick={() => handleStartEdit(p)}
+                                        className="text-slate-400 hover:text-indigo-600 p-1 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer"
+                                        title="Edit Transaksi"
+                                      >
+                                        <Edit className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteTransactionClick(p.id)}
+                                        className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                                        title="Hapus Transaksi"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span title="Hanya Owner" className="text-slate-300">
+                                      <Lock className="w-3.5 h-3.5" />
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -670,12 +818,14 @@ export default function KasirSesiPanel({
                           💵 Uang Cash Fisik di Laci (Rp)
                         </label>
                         <input
-                          type="number"
+                          type="text"
                           id="cashier-actual-cash"
                           required
-                          min="0"
-                          value={actualCash}
-                          onChange={(e) => setActualCash(Number(e.target.value))}
+                          value={actualCash === 0 ? '' : actualCash.toLocaleString('id-ID')}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setActualCash(val ? parseInt(val, 10) : 0);
+                          }}
                           className="w-full px-4 py-2.5 text-base bg-rose-50/10 dark:bg-rose-950/10 border-2 border-rose-100 focus:border-rose-500 rounded-xl text-slate-800 dark:text-white outline-none font-mono font-bold transition"
                         />
                         <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
@@ -809,6 +959,7 @@ export default function KasirSesiPanel({
                       <th className="py-3 px-3 text-right">Fisik Terhitung</th>
                       <th className="py-3 px-3 text-right">Discrepancy (Selisih)</th>
                       <th className="py-3 px-3">Keterangan</th>
+                      <th className="py-3 px-3 text-center print:hidden">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-indigo-50/45 dark:divide-slate-800">
@@ -850,6 +1001,21 @@ export default function KasirSesiPanel({
                               {s.notes || <span className="text-slate-300">tidak ada catatan</span>}
                             </p>
                           </td>
+                          <td className="py-3.5 px-3 text-center align-middle print:hidden">
+                            {userRole === 'OWNER' ? (
+                              <button
+                                onClick={() => handleStartEditSession(s)}
+                                className="text-indigo-600 hover:text-indigo-800 p-1.5 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
+                                title="Edit Sesi"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <span title="Hanya Owner" className="text-slate-300">
+                                <Lock className="w-3.5 h-3.5" />
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
@@ -859,6 +1025,270 @@ export default function KasirSesiPanel({
             );
           })()}
 
+        </div>
+      )}
+
+      {/* --- HIGH-FIDELITY EDIT TRANSACTION DIALOG --- */}
+      {editingTransaction && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[60] overflow-y-auto animate-fade-in print:hidden text-left" id="edit-transaction-modal">
+          <div className="bg-white border-2 border-indigo-100 rounded-3xl w-full max-w-md shadow-2xl relative overflow-hidden text-slate-800 font-sans">
+            
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-indigo-100 bg-indigo-50/50 flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                  <Edit className="w-4 h-4 text-indigo-600" />
+                  Mengubah Mutasi Kas Toko
+                </h3>
+                <p className="text-[10px] text-slate-500 font-bold mt-0.5">Ubah rincian mutasi kas masuk/keluar harian</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingTransaction(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm bg-transparent border-none cursor-pointer outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
+              
+              {/* Type info */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Tipe Mutasi</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditType('DP')}
+                    className={`py-2 px-3 text-center text-xs font-black uppercase rounded-xl transition ${editType === 'DP' ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Uang Muka (DP)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditType('PELUNASAN')}
+                    className={`py-2 px-3 text-center text-xs font-black uppercase rounded-xl transition ${editType === 'PELUNASAN' ? 'bg-teal-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Pelunasan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditType('PENGELUARAN')}
+                    className={`py-2 px-3 text-center text-xs font-black uppercase rounded-xl transition ${editType === 'PENGELUARAN' ? 'bg-rose-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Pengeluaran
+                  </button>
+                </div>
+              </div>
+
+              {/* Amount of money */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Nominal (Rupiah)</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 font-mono">Rp</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="0"
+                    value={editAmount}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      if (val) {
+                        setEditAmount(parseInt(val, 10).toLocaleString('id-ID'));
+                      } else {
+                        setEditAmount('');
+                      }
+                    }}
+                    className="w-full bg-slate-50 text-slate-800 pl-10 pr-4 py-3 rounded-2xl border border-slate-200 text-sm font-black font-mono focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                </div>
+              </div>
+
+              {/* Method select */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Metode Pembayaran</label>
+                <select
+                  value={editMethod}
+                  onChange={(e) => setEditMethod(e.target.value as 'CASH' | 'TRANSFER')}
+                  className="w-full bg-slate-50 text-slate-800 border border-slate-200 px-3.5 py-3 rounded-2xl text-sm font-bold focus:border-indigo-400 focus:outline-none"
+                >
+                  <option value="CASH">💵 TUNAI (CASH)</option>
+                  <option value="TRANSFER">🏦 TRANSFER BANK</option>
+                </select>
+              </div>
+
+              {/* Keterangan */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Keterangan / Keperluan</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Keterangan transaksi"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Client name (optional) */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Nama Pelanggan (Opsional)</label>
+                <input
+                  type="text"
+                  placeholder="Nama pelanggan/rekanan"
+                  value={editCustomer}
+                  onChange={(e) => setEditCustomer(e.target.value)}
+                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Timestamp info */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Waktu Transaksi</label>
+                <input
+                  type="datetime-local"
+                  value={editTimestamp ? new Date(editTimestamp).toISOString().slice(0, 16) : ''}
+                  onChange={(e) => setEditTimestamp(new Date(e.target.value).toISOString())}
+                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTransaction(null)}
+                  className="py-3 px-4 text-xs font-black uppercase text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="py-3 px-4 text-xs font-black uppercase text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl shadow-lg shadow-indigo-100 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <RefreshCcw className="w-4 h-4 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Simpan
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- HIGH-FIDELITY EDIT CLOSED SESSION DIALOG --- */}
+      {editingSession && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[60] overflow-y-auto animate-fade-in print:hidden text-left" id="edit-session-modal">
+          <div className="bg-white border-2 border-indigo-100 rounded-3xl w-full max-w-md shadow-2xl relative overflow-hidden text-slate-800 font-sans">
+            
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-indigo-100 bg-indigo-50/50 flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-indigo-600" />
+                  Mengubah Sesi Laci Kasir
+                </h3>
+                <p className="text-[10px] text-slate-500 font-bold mt-0.5">Edit modal awal dan hasil pencatatan fisik laci kasir</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingSession(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm bg-transparent border-none cursor-pointer outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditSession} className="p-5 space-y-4">
+              
+              {/* Opening balance */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Modal Awal Sesi (Rupiah)</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 font-mono">Rp</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="0"
+                    value={editSessionOpening}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      if (val) {
+                        setEditSessionOpening(parseInt(val, 10).toLocaleString('id-ID'));
+                      } else {
+                        setEditSessionOpening('');
+                      }
+                    }}
+                    className="w-full bg-slate-50 text-slate-800 pl-10 pr-4 py-3 rounded-2xl border border-slate-200 text-sm font-black font-mono focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                </div>
+              </div>
+
+              {/* Actual cash count */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Uang Fisik Terhitung (Closing)</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 font-mono">Rp</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="0"
+                    value={editSessionActual}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      if (val) {
+                        setEditSessionActual(parseInt(val, 10).toLocaleString('id-ID'));
+                      } else {
+                        setEditSessionActual('');
+                      }
+                    }}
+                    className="w-full bg-slate-50 text-slate-800 pl-10 pr-4 py-3 rounded-2xl border border-slate-200 text-sm font-black font-mono focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                </div>
+              </div>
+
+              {/* Session notes */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Catatan Closing Sesi</label>
+                <textarea
+                  placeholder="Catatan discrepancy selisih laci atau rincian tutup kasir"
+                  rows={3}
+                  value={editSessionNotes}
+                  onChange={(e) => setEditSessionNotes(e.target.value)}
+                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingSession(null)}
+                  className="py-3 px-4 text-xs font-black uppercase text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="py-3 px-4 text-xs font-black uppercase text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-lg shadow-indigo-100 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  Simpan Perubahan
+                </button>
+              </div>
+
+            </form>
+          </div>
         </div>
       )}
 

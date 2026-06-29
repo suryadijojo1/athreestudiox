@@ -13,12 +13,17 @@ import {
   RefreshCw,
   Trash2,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Edit,
+  Lock,
+  X,
+  Check
 } from 'lucide-react';
 
 interface BukuMutasiProps {
   paymentTransactions: PaymentTransaction[];
   onAddCustomTransaction: (tx: PaymentTransaction) => void;
+  onUpdateCustomTransaction?: (tx: PaymentTransaction) => void;
   onDeleteCustomTransaction?: (txId: string) => void;
   userRole: string;
   activeSession?: CashierSession | null;
@@ -35,6 +40,7 @@ interface BankAccount {
 export default function BukuMutasi({
   paymentTransactions,
   onAddCustomTransaction,
+  onUpdateCustomTransaction,
   onDeleteCustomTransaction,
   userRole,
   activeSession = null,
@@ -74,6 +80,61 @@ export default function BukuMutasi({
     const saved = localStorage.getItem('athree_mutasi_starting_balance');
     return saved ? Number(saved) : 782890318;
   });
+
+  // Editing transaction state for Owner
+  const [editingTransaction, setEditingTransaction] = useState<PaymentTransaction | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editCustomer, setEditCustomer] = useState('');
+  const [editMethod, setEditMethod] = useState<'CASH' | 'TRANSFER'>('CASH');
+  const [editType, setEditType] = useState<'DP' | 'PELUNASAN' | 'PENGELUARAN'>('PELUNASAN');
+  const [editTimestamp, setEditTimestamp] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const handleStartEdit = (tx: PaymentTransaction) => {
+    setEditingTransaction(tx);
+    setEditAmount(tx.amount.toLocaleString('id-ID'));
+    setEditNotes(tx.notes || '');
+    setEditCustomer(tx.customerName || '');
+    setEditMethod(tx.method);
+    setEditType(tx.type);
+    setEditTimestamp(tx.timestamp);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction) return;
+
+    const parsedAmount = parseFloat(editAmount.replace(/[^0-9]/g, ''));
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      alert("Harap masukkan nominal transaksi mutasi yang valid!");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      const updatedTx: PaymentTransaction = {
+        ...editingTransaction,
+        amount: parsedAmount,
+        method: editMethod,
+        type: editType,
+        notes: editNotes.trim(),
+        customerName: editCustomer.trim() ? editCustomer.trim() : undefined,
+        timestamp: editTimestamp || new Date().toISOString()
+      };
+
+      if (onUpdateCustomTransaction) {
+        await onUpdateCustomTransaction(updatedTx);
+      }
+      setEditingTransaction(null);
+      showToast('Transaksi berhasil diperbarui.', 'success');
+    } catch (err) {
+      console.error("Gagal mengubah transaksi:", err);
+      alert("Gagal menyimpan perubahan transaksi!");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
 
   // Find session for start date to match cash drawer opening balance
   const sessionForStartDate = useMemo(() => {
@@ -190,8 +251,12 @@ export default function BukuMutasi({
       const isTransfer = tx.method === 'TRANSFER';
       const amount = tx.amount;
 
-      // Update rolling balance only for non-transfer transactions
-      if (!isTransfer) {
+      // Update rolling balance based on current method filter context
+      const affectsBalance = selectedMethod === 'ALL' 
+        ? true 
+        : (selectedMethod === 'CASH' ? !isTransfer : isTransfer);
+
+      if (affectsBalance) {
         if (isDebit) {
           currentBal -= amount;
         } else {
@@ -240,7 +305,8 @@ export default function BukuMutasi({
   // Handle form submission for manual mutation
   const handleSubmitManualMutation = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formAmount || Number(formAmount) <= 0) {
+    const parsedAmount = parseFloat(formAmount.replace(/[^0-9]/g, ''));
+    if (!formAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
       alert('Masukkan jumlah uang yang valid!');
       return;
     }
@@ -252,7 +318,7 @@ export default function BukuMutasi({
 
     const newTx: PaymentTransaction = {
       id: `manual-tx-${Date.now()}`,
-      amount: Number(formAmount),
+      amount: parsedAmount,
       method: formMethod,
       type: formType,
       timestamp: isoTimestamp,
@@ -392,11 +458,18 @@ export default function BukuMutasi({
               <div>
                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Jumlah Uang (Rp)</label>
                 <input
-                  type="number"
-                  placeholder="Contoh: 2000000"
+                  type="text"
+                  placeholder="Contoh: 2.000.000"
                   value={formAmount}
-                  onChange={(e) => setFormAmount(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-medium"
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    if (val) {
+                      setFormAmount(parseInt(val, 10).toLocaleString('id-ID'));
+                    } else {
+                      setFormAmount('');
+                    }
+                  }}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono font-bold"
                   required
                 />
               </div>
@@ -473,15 +546,16 @@ export default function BukuMutasi({
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
               <input
-                type="number"
-                value={selectedMethod === 'CASH' ? effectiveStartingBalance : startingBalance}
+                type="text"
+                value={(selectedMethod === 'CASH' ? effectiveStartingBalance : startingBalance).toLocaleString('id-ID')}
                 onChange={(e) => {
                   if (selectedMethod !== 'CASH') {
-                    setStartingBalance(Number(e.target.value));
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    setStartingBalance(val ? parseInt(val, 10) : 0);
                   }
                 }}
                 disabled={selectedMethod === 'CASH'}
-                className={`w-full border border-indigo-100 rounded-xl pl-9 pr-3.5 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-bold text-slate-700 ${
+                className={`w-full border border-indigo-100 rounded-xl pl-9 pr-3.5 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono font-bold text-slate-700 ${
                   selectedMethod === 'CASH' ? 'bg-slate-50 cursor-not-allowed text-slate-400' : 'bg-white'
                 }`}
               />
@@ -668,15 +742,30 @@ export default function BukuMutasi({
                         {mut.balanceFormatted}
                       </td>
                       <td className="px-3 py-3 text-center align-top print:hidden">
-                        {mut.id.startsWith('manual-tx-') && (
-                          <button
-                            onClick={() => handleDeleteMutation(mut.id)}
-                            className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors"
-                            title="Hapus manual entry"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <div className="flex items-center justify-center gap-1.5">
+                          {userRole === 'OWNER' && (
+                            <button
+                              onClick={() => handleStartEdit(mut)}
+                              className="text-indigo-600 hover:text-indigo-800 p-1 rounded-lg hover:bg-indigo-50 transition-colors"
+                              title="Edit Transaksi"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {(userRole === 'OWNER' || mut.id.startsWith('manual-tx-')) ? (
+                            <button
+                              onClick={() => handleDeleteMutation(mut.id)}
+                              className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                              title="Hapus Transaksi"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <span title="Hanya Owner" className="text-slate-300">
+                              <Lock className="w-3.5 h-3.5" />
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -709,6 +798,164 @@ export default function BukuMutasi({
           Printed automatically by Athree POS Cashier System on {new Date().toLocaleString('id-ID')}
         </div>
       </div>
+
+      {/* --- HIGH-FIDELITY EDIT TRANSACTION DIALOG --- */}
+      {editingTransaction && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[60] overflow-y-auto animate-fade-in print:hidden" id="edit-transaction-modal">
+          <div className="bg-white border-2 border-indigo-100 rounded-3xl w-full max-w-md shadow-2xl relative overflow-hidden text-slate-800 font-sans">
+            
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-indigo-100 bg-indigo-50/50 flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                  <Edit className="w-4 h-4 text-indigo-600" />
+                  Mengubah Mutasi Kas Toko
+                </h3>
+                <p className="text-[10px] text-slate-500 font-bold mt-0.5">Ubah rincian mutasi kas masuk/keluar harian</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingTransaction(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm bg-transparent border-none cursor-pointer outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-5 space-y-4 text-left">
+              
+              {/* Type info */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Tipe Mutasi</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditType('DP')}
+                    className={`py-2 px-3 text-center text-xs font-black uppercase rounded-xl transition ${editType === 'DP' ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Uang Muka (DP)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditType('PELUNASAN')}
+                    className={`py-2 px-3 text-center text-xs font-black uppercase rounded-xl transition ${editType === 'PELUNASAN' ? 'bg-teal-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Pelunasan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditType('PENGELUARAN')}
+                    className={`py-2 px-3 text-center text-xs font-black uppercase rounded-xl transition ${editType === 'PENGELUARAN' ? 'bg-rose-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Pengeluaran
+                  </button>
+                </div>
+              </div>
+
+              {/* Amount of money */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Nominal (Rupiah)</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 font-mono">Rp</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="0"
+                    value={editAmount}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      if (val) {
+                        setEditAmount(parseInt(val, 10).toLocaleString('id-ID'));
+                      } else {
+                        setEditAmount('');
+                      }
+                    }}
+                    className="w-full bg-slate-50 text-slate-800 pl-10 pr-4 py-3 rounded-2xl border border-slate-200 text-sm font-black font-mono focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                </div>
+              </div>
+
+              {/* Method select */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Metode Pembayaran</label>
+                <select
+                  value={editMethod}
+                  onChange={(e) => setEditMethod(e.target.value as 'CASH' | 'TRANSFER')}
+                  className="w-full bg-slate-50 text-slate-800 border border-slate-200 px-3.5 py-3 rounded-2xl text-sm font-bold focus:border-indigo-400 focus:outline-none"
+                >
+                  <option value="CASH">💵 TUNAI (CASH)</option>
+                  <option value="TRANSFER">🏦 TRANSFER BANK</option>
+                </select>
+              </div>
+
+              {/* Keterangan */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Keterangan / Keperluan</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Keterangan transaksi"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Client name (optional) */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Nama Pelanggan (Opsional)</label>
+                <input
+                  type="text"
+                  placeholder="Nama pelanggan/rekanan"
+                  value={editCustomer}
+                  onChange={(e) => setEditCustomer(e.target.value)}
+                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Timestamp info */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Waktu Transaksi</label>
+                <input
+                  type="datetime-local"
+                  value={editTimestamp ? new Date(editTimestamp).toISOString().slice(0, 16) : ''}
+                  onChange={(e) => setEditTimestamp(new Date(e.target.value).toISOString())}
+                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTransaction(null)}
+                  className="py-3 px-4 text-xs font-black uppercase text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="py-3 px-4 text-xs font-black uppercase text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl shadow-lg shadow-indigo-100 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Simpan
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

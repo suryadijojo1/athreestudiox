@@ -702,13 +702,15 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                       Jumlah Pelunasan Masuk (Rp)
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       id="settle-amount-input"
                       required
-                      min="1"
-                      max={currentInvoice.remainingDebt}
-                      value={settleAmount}
-                      onChange={(e) => setSettleAmount(Math.min(currentInvoice.remainingDebt, Number(e.target.value)))}
+                      value={settleAmount === 0 ? '' : settleAmount.toLocaleString('id-ID')}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        const numVal = val ? parseInt(val, 10) : 0;
+                        setSettleAmount(Math.min(currentInvoice.remainingDebt, numVal));
+                      }}
                       className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 border-2 border-indigo-50 rounded-2xl text-slate-800 outline-none focus:border-indigo-500 font-mono font-bold transition"
                     />
                     <p className="text-[10px] text-slate-400 font-bold mt-1 leading-relaxed">
