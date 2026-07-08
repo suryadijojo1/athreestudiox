@@ -533,9 +533,10 @@ export default function Dashboard({
   const prosesCount = invoices.filter(inv => inv.productionStatus === 'PROSES').length;
   const selesaiCount = invoices.filter(inv => inv.productionStatus === 'SELESAI').length;
   const siapAmbilCount = invoices.filter(inv => inv.productionStatus === 'SIAP_DIAMBIL').length;
+  const sudahDiambilCount = invoices.filter(inv => inv.productionStatus === 'SUDAH_DIAMBIL').length;
 
   const totalSedangDiproses = antreanCount + desainCount + prosesCount;
-  const totalSelesaiDanSiap = selesaiCount + siapAmbilCount;
+  const totalSelesaiDanSiap = selesaiCount + siapAmbilCount + sudahDiambilCount;
   const completionPercentage = totalNotesCount > 0 ? Math.round((totalSelesaiDanSiap / totalNotesCount) * 100) : 0;
 
   const renderMutasiKasHarian = (showHeader: boolean = true) => {
@@ -997,14 +998,16 @@ export default function Dashboard({
     today.setHours(0, 0, 0, 0);
 
     return invoices.filter(inv => {
-      const isCompleted = inv.productionStatus === 'SELESAI' || inv.productionStatus === 'SIAP_DIAMBIL';
+      const isCompleted = inv.productionStatus === 'SELESAI' || inv.productionStatus === 'SIAP_DIAMBIL' || inv.productionStatus === 'SUDAH_DIAMBIL';
       if (isCompleted) return false;
       if (!inv.deadlineDate) return false;
 
       try {
         const deadline = new Date(inv.deadlineDate);
         deadline.setHours(0, 0, 0, 0);
-        return deadline.getTime() <= today.getTime();
+        const diffTime = deadline.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays <= 3;
       } catch {
         return false;
       }
@@ -2211,7 +2214,7 @@ export default function Dashboard({
                                     </td>
                                     <td className="px-4 py-3.5 text-center">
                                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                                        inv.productionStatus === 'SELESAI' || inv.productionStatus === 'SIAP_DIAMBIL'
+                                        inv.productionStatus === 'SELESAI' || inv.productionStatus === 'SIAP_DIAMBIL' || inv.productionStatus === 'SUDAH_DIAMBIL'
                                           ? 'bg-emerald-55/65 text-emerald-700'
                                           : inv.productionStatus === 'ANTREAN'
                                           ? 'bg-slate-100 text-slate-500'

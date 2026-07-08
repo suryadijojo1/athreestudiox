@@ -37,7 +37,7 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
     return '';
   });
   const [notes, setNotes] = useState(invoiceToEdit ? invoiceToEdit.notes || '' : '');
-  const [productionStatus, setProductionStatus] = useState<'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL'>(
+  const [productionStatus, setProductionStatus] = useState<'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL'>(
     invoiceToEdit ? invoiceToEdit.productionStatus || 'ANTREAN' : 'ANTREAN'
   );
 
@@ -540,6 +540,7 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
                   <option value="PROSES">⚙️ PROSES (Produksi/Sablon/Jahit)</option>
                   <option value="SELESAI">✅ SELESAI (Finishing/QC)</option>
                   <option value="SIAP_DIAMBIL">📦 SIAP DIAMBIL (Menunggu Pelanggan)</option>
+                  <option value="SUDAH_DIAMBIL">🤝 SUDAH DI AMBIL (Selesai Penyerahan)</option>
                 </select>
               </div>
             </div>

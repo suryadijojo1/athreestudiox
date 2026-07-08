@@ -11,7 +11,7 @@ interface NotaListProps {
   invoices: Invoice[];
   onSelectInvoice: (invoice: Invoice) => void;
   onPaySettlement: (invoiceId: string, amount: number, paymentMethod?: 'CASH' | 'TRANSFER') => void;
-  onUpdateProductionStatus: (invoiceId: string, status: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL') => void;
+  onUpdateProductionStatus: (invoiceId: string, status: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL') => void;
   onEditInvoice?: (invoice: Invoice) => void;
   onQuickPrint?: (invoice: Invoice) => void;
   onDeleteInvoice?: (invoiceId: string) => void;
@@ -21,7 +21,7 @@ interface NotaListProps {
 export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, onUpdateProductionStatus, onEditInvoice, onQuickPrint, onDeleteInvoice, userRole = 'OWNER' }: NotaListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'SEMAU' | 'LUNAS' | 'DP' | 'BELUM_BAYAR'>('SEMAU');
-  const [productionFilter, setProductionFilter] = useState<'SEMAU' | 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL'>('SEMAU');
+  const [productionFilter, setProductionFilter] = useState<'SEMAU' | 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL'>('SEMAU');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [deadlineAlertFilter, setDeadlineAlertFilter] = useState<boolean>(false);
@@ -117,7 +117,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
 
   const getDeadlineBadge = (deadlineDateStr: string | undefined, productionStatus: string | undefined) => {
     if (!deadlineDateStr) return <span className="text-slate-350 text-xs font-extrabold">-</span>;
-    const isCompleted = productionStatus === 'SELESAI' || productionStatus === 'SIAP_DIAMBIL';
+    const isCompleted = productionStatus === 'SELESAI' || productionStatus === 'SIAP_DIAMBIL' || productionStatus === 'SUDAH_DIAMBIL';
     
     try {
       const today = new Date();
@@ -150,7 +150,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
             ⏰ Hari Ini ({formatted})
           </span>
         );
-      } else if (diffDays <= 2) {
+      } else if (diffDays <= 3) {
         return (
           <span className="inline-flex items-center gap-1 text-[10.5px] bg-indigo-50 text-indigo-700 font-extrabold px-2.5 py-0.5 rounded-full border border-indigo-100" title={`${diffDays} hari lagi!`}>
             ⏳ {formatted} ({diffDays}H)
@@ -176,7 +176,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
 
   const getDeadlineStatus = (deadlineDateStr: string | undefined, productionStatus: string | undefined) => {
     if (!deadlineDateStr) return null;
-    const isCompleted = productionStatus === 'SELESAI' || productionStatus === 'SIAP_DIAMBIL';
+    const isCompleted = productionStatus === 'SELESAI' || productionStatus === 'SIAP_DIAMBIL' || productionStatus === 'SUDAH_DIAMBIL';
     if (isCompleted) return null;
 
     try {
@@ -193,6 +193,8 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
         return 'overdue';
       } else if (diffDays === 0) {
         return 'today';
+      } else if (diffDays <= 3) {
+        return 'warning';
       }
     } catch {}
     return null;
@@ -205,6 +207,9 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     }
     if (dlStatus === 'today') {
       return "bg-amber-50/65 hover:bg-amber-100 border-b border-amber-150/85 text-amber-950 font-semibold";
+    }
+    if (dlStatus === 'warning') {
+      return "bg-indigo-50/40 hover:bg-indigo-100 border-b border-indigo-100/50 text-indigo-950 font-semibold";
     }
     return "hover:bg-indigo-50/10 border-b border-indigo-50/30 text-slate-705";
   };
@@ -243,7 +248,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     // Check deadline alert filter
     if (deadlineAlertFilter) {
       const dlStatus = getDeadlineStatus(inv.deadlineDate, inv.productionStatus);
-      if (dlStatus !== 'overdue' && dlStatus !== 'today') {
+      if (dlStatus !== 'overdue' && dlStatus !== 'today' && dlStatus !== 'warning') {
         return false;
       }
     }
@@ -261,7 +266,8 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
   // Count due/overdue invoices
   const overdueInvoices = invoices.filter(inv => getDeadlineStatus(inv.deadlineDate, inv.productionStatus) === 'overdue');
   const todayInvoices = invoices.filter(inv => getDeadlineStatus(inv.deadlineDate, inv.productionStatus) === 'today');
-  const totalAlerts = overdueInvoices.length + todayInvoices.length;
+  const warningInvoices = invoices.filter(inv => getDeadlineStatus(inv.deadlineDate, inv.productionStatus) === 'warning');
+  const totalAlerts = overdueInvoices.length + todayInvoices.length + warningInvoices.length;
 
   return (
     <div className="space-y-6" id="nota-list-view">
@@ -278,7 +284,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                 🔔 Pengingat Jatuh Tempo Produksi
               </h3>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                Ada <span className="font-extrabold text-rose-650 font-mono">{overdueInvoices.length} nota melewati batas deadline (Overdue)</span> dan <span className="font-extrabold text-amber-655 font-mono">{todayInvoices.length} nota batas selesai hari ini</span> yang produksinya masih berjalan. Segera selesaikan dan hubungi pelanggan.
+                Ada <span className="font-extrabold text-rose-650 font-mono">{overdueInvoices.length} nota melewati batas deadline (Overdue)</span>, <span className="font-extrabold text-amber-655 font-mono">{todayInvoices.length} nota batas selesai hari ini</span>, dan <span className="font-extrabold text-indigo-650 font-mono">{warningInvoices.length} nota mendekati deadline (≤ 3 hari)</span> yang produksinya masih berjalan. Segera selesaikan dan hubungi pelanggan.
               </p>
             </div>
           </div>
@@ -427,6 +433,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
               <option value="PROSES">⚙️ PROSES PRODUKSI</option>
               <option value="SELESAI">✅ SELESAI PRODUKSI</option>
               <option value="SIAP_DIAMBIL">📦 SIAP DIAMBIL</option>
+              <option value="SUDAH_DIAMBIL">🤝 SUDAH DI AMBIL</option>
             </select>
           </div>
         </div>
@@ -561,7 +568,9 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                             ? 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200'
                             : (inv.productionStatus || 'ANTREAN') === 'SELESAI'
                             ? 'bg-teal-50 text-teal-700 border-teal-100 hover:bg-teal-100 hover:border-teal-200'
-                            : 'bg-green-50 text-green-700 border-green-100 hover:bg-green-100 hover:border-green-200'
+                            : (inv.productionStatus || 'ANTREAN') === 'SIAP_DIAMBIL'
+                            ? 'bg-green-50 text-green-700 border-green-100 hover:bg-green-100 hover:border-green-200'
+                            : 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100 hover:border-blue-200'
                         }`}
                       >
                         {userRole !== 'PRODUKSI' ? (
@@ -571,6 +580,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                             <option value="PROSES">⚙️ PROSES</option>
                             <option value="SELESAI">✅ SELESAI</option>
                             <option value="SIAP_DIAMBIL">📦 SIAP</option>
+                            <option value="SUDAH_DIAMBIL">🤝 DIAMBIL</option>
                           </>
                         ) : (
                           <>
@@ -582,6 +592,9 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                             <option value="SELESAI">✅ SELESAI</option>
                             {inv.productionStatus === 'SIAP_DIAMBIL' && (
                               <option value="SIAP_DIAMBIL">📦 SIAP</option>
+                            )}
+                            {inv.productionStatus === 'SUDAH_DIAMBIL' && (
+                              <option value="SUDAH_DIAMBIL">🤝 DIAMBIL</option>
                             )}
                           </>
                         )}

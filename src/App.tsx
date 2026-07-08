@@ -985,7 +985,7 @@ export default function App() {
   };
 
   // Update production status of an invoice
-  const handleUpdateProductionStatus = (invoiceId: string, status: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL') => {
+  const handleUpdateProductionStatus = (invoiceId: string, status: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL') => {
     let invoiceNum = '';
     const nextInvoices = invoices.map(inv => {
       if (inv.id === invoiceId) {

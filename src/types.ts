@@ -39,7 +39,7 @@ export interface Invoice {
   status: 'BELUM_BAYAR' | 'DP' | 'LUNAS';
   customStatusLabel?: string; // e.g., "DP 50%"
   notes?: string;
-  productionStatus?: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL';
+  productionStatus?: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL';
   deadlineDate?: string; // YYYY-MM-DD
   paymentMethodDP?: 'CASH' | 'TRANSFER';
   paymentMethodSettlement?: 'CASH' | 'TRANSFER';

@@ -12,7 +12,7 @@ interface NotaDetailModalProps {
   invoice: Invoice | null;
   onClose: () => void;
   onPaySettlement: (invoiceId: string, amount: number, paymentMethod?: 'CASH' | 'TRANSFER') => void;
-  onUpdateProductionStatus?: (invoiceId: string, status: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL') => void;
+  onUpdateProductionStatus?: (invoiceId: string, status: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL') => void;
   isQuickPrint?: boolean;
 }
 
@@ -680,6 +680,7 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
                         <option value="PROSES">⚙️ PROSES</option>
                         <option value="SELESAI">✅ SELESAI</option>
                         <option value="SIAP_DIAMBIL">📦 SIAP</option>
+                        <option value="SUDAH_DIAMBIL">🤝 DIAMBIL</option>
                       </select>
                     ) : (
                       <span className="font-extrabold text-xs text-indigo-600 block mt-1">
@@ -695,6 +696,7 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
                     {invoice.productionStatus === 'PROSES' && '⚙️ PROSES PRODUKSI'}
                     {invoice.productionStatus === 'SELESAI' && '✅ SELESAI PRODUKSI'}
                     {invoice.productionStatus === 'SIAP_DIAMBIL' && '📦 BARANG SIAP DIAMBIL'}
+                    {invoice.productionStatus === 'SUDAH_DIAMBIL' && '🤝 BARANG SUDAH DI AMBIL'}
                     {(!invoice.productionStatus || invoice.productionStatus === 'ANTREAN') && '⏳ ANTREAN PRODUKSI'}
                   </div>
                 </div>
