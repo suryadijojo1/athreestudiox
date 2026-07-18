@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession, ShopSettings } from './types';
 import { motion } from 'motion/react';
 import { INITIAL_PRODUCTS, INITIAL_INVOICES, INITIAL_MOVEMENTS, INITIAL_AUDIT_LOGS } from './initialData';
-import { doc, getDocFromServer } from 'firebase/firestore';
+import { doc, getDocFromServer, onSnapshot, collection } from 'firebase/firestore';
 import { 
   loadCollectionFromFirestore, 
   saveDocumentToFirestore, 
@@ -621,6 +621,195 @@ export default function App() {
 
     loadDatabase();
   }, []);
+
+  // --- REAL-TIME FIRESTORE MULTI-DEVICE SYNCHRONIZATION ---
+  useEffect(() => {
+    if (!isDatabaseLoaded) return;
+
+    // Listen to 'products' collection
+    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const items: Product[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push(docSnap.data() as Product);
+      });
+      setProducts((current) => {
+        if (JSON.stringify(current) !== JSON.stringify(items)) {
+          localStorage.setItem('nota_stok_products', JSON.stringify(items));
+          return items;
+        }
+        return current;
+      });
+    }, (error) => {
+      console.error("Gagal listen products:", error);
+    });
+
+    // Listen to 'invoices' collection
+    const unsubInvoices = onSnapshot(collection(db, 'invoices'), (snapshot) => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const items: Invoice[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push(docSnap.data() as Invoice);
+      });
+      setInvoices((current) => {
+        if (JSON.stringify(current) !== JSON.stringify(items)) {
+          localStorage.setItem('nota_stok_invoices', JSON.stringify(items));
+          return items;
+        }
+        return current;
+      });
+    }, (error) => {
+      console.error("Gagal listen invoices:", error);
+    });
+
+    // Listen to 'movements' collection
+    const unsubMovements = onSnapshot(collection(db, 'movements'), (snapshot) => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const items: StockMovement[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push(docSnap.data() as StockMovement);
+      });
+      setMovements((current) => {
+        if (JSON.stringify(current) !== JSON.stringify(items)) {
+          localStorage.setItem('nota_stok_movements', JSON.stringify(items));
+          return items;
+        }
+        return current;
+      });
+    }, (error) => {
+      console.error("Gagal listen movements:", error);
+    });
+
+    // Listen to 'payment_transactions' collection
+    const unsubPayments = onSnapshot(collection(db, 'payment_transactions'), (snapshot) => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const items: PaymentTransaction[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push(docSnap.data() as PaymentTransaction);
+      });
+      setPaymentTransactions((current) => {
+        if (JSON.stringify(current) !== JSON.stringify(items)) {
+          localStorage.setItem('nota_stok_payment_transactions', JSON.stringify(items));
+          return items;
+        }
+        return current;
+      });
+    }, (error) => {
+      console.error("Gagal listen payment_transactions:", error);
+    });
+
+    // Listen to 'sessions_history' collection
+    const unsubHistory = onSnapshot(collection(db, 'sessions_history'), (snapshot) => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const items: CashierSession[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push(docSnap.data() as CashierSession);
+      });
+      setSessionsHistory((current) => {
+        if (JSON.stringify(current) !== JSON.stringify(items)) {
+          localStorage.setItem('nota_stok_sessions_history', JSON.stringify(items));
+          return items;
+        }
+        return current;
+      });
+    }, (error) => {
+      console.error("Gagal listen sessions_history:", error);
+    });
+
+    // Listen to 'metadata' collection for active_session, credentials, sales_agents, shop_settings
+    const unsubMetadata = onSnapshot(collection(db, 'metadata'), (snapshot) => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      snapshot.forEach((ds) => {
+        const data = ds.data();
+        if (ds.id === 'active_session') {
+          const session = data.activeSession || null;
+          setActiveSession((current) => {
+            if (JSON.stringify(current) !== JSON.stringify(session)) {
+              if (session) {
+                localStorage.setItem('nota_stok_active_session', JSON.stringify(session));
+              } else {
+                localStorage.removeItem('nota_stok_active_session');
+              }
+              return session;
+            }
+            return current;
+          });
+        } else if (ds.id === 'credentials') {
+          if (data.kasirPassword) {
+            setKasirPassword((current) => {
+              if (current !== data.kasirPassword) {
+                localStorage.setItem('nota_stok_kasir_password', data.kasirPassword);
+                return data.kasirPassword;
+              }
+              return current;
+            });
+          }
+          if (data.ownerPassword) {
+            setOwnerPassword((current) => {
+              if (current !== data.ownerPassword) {
+                localStorage.setItem('nota_stok_owner_password', data.ownerPassword);
+                return data.ownerPassword;
+              }
+              return current;
+            });
+          }
+          if (data.produksiPassword) {
+            setProduksiPassword((current) => {
+              if (current !== data.produksiPassword) {
+                localStorage.setItem('nota_stok_produksi_password', data.produksiPassword);
+                return data.produksiPassword;
+              }
+              return current;
+            });
+          }
+        } else if (ds.id === 'sales_agents') {
+          const agents = data.agents || [];
+          const storedSalesStr = localStorage.getItem('athree_sales_agents');
+          if (JSON.stringify(agents) !== storedSalesStr) {
+            localStorage.setItem('athree_sales_agents', JSON.stringify(agents));
+            window.dispatchEvent(new Event('athree-sales-agents-changed'));
+          }
+        } else if (ds.id === 'shop_settings') {
+          const storedLogoType = localStorage.getItem('athree-shop-logo-type');
+          const storedPresetKey = localStorage.getItem('athree-shop-logo-preset');
+          const storedCustomUrl = localStorage.getItem('athree_custom_logo_data');
+          const storedShopName = localStorage.getItem('athree-shop-name');
+          const storedShopSlogan = localStorage.getItem('athree-shop-slogan');
+
+          const hasLogoChanged = 
+            storedLogoType !== data.logoType ||
+            storedPresetKey !== data.presetKey ||
+            storedCustomUrl !== data.customUrl ||
+            storedShopName !== data.shopName ||
+            storedShopSlogan !== data.shopSlogan;
+
+          if (hasLogoChanged) {
+            localStorage.setItem('athree-shop-logo-type', data.logoType);
+            localStorage.setItem('athree-shop-logo-preset', data.presetKey);
+            if (data.customUrl) {
+              localStorage.setItem('athree_custom_logo_data', data.customUrl);
+            } else {
+              localStorage.removeItem('athree_custom_logo_data');
+            }
+            localStorage.setItem('athree-shop-name', data.shopName);
+            localStorage.setItem('athree-shop-slogan', data.shopSlogan);
+            window.dispatchEvent(new Event('athree-logo-changed'));
+          }
+        }
+      });
+    }, (error) => {
+      console.error("Gagal listen metadata:", error);
+    });
+
+    return () => {
+      unsubProducts();
+      unsubInvoices();
+      unsubMovements();
+      unsubPayments();
+      unsubHistory();
+      unsubMetadata();
+    };
+  }, [isDatabaseLoaded]);
 
   useEffect(() => {
     const handleInvoicesSync = () => {
