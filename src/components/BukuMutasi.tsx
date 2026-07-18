@@ -423,7 +423,7 @@ export default function BukuMutasi({
           <div>
             <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-indigo-600" />
-              Simulator &amp; Buku Mutasi Rekening
+              Buku Mutasi Rekening
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
               Cetak dan simpan rekapitulasi mutasi setoran / transfer yang selaras dengan rekening bank Anda.
@@ -561,23 +561,7 @@ export default function BukuMutasi({
         )}
 
         {/* Live Config Filters */}
-        <div className="bg-indigo-50/20 border border-indigo-50 rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase block mb-1.5">Pilih Rekening Bank</label>
-            <select
-              value={selectedBankId}
-              onChange={(e) => setSelectedBankId(e.target.value)}
-              className="w-full bg-white border border-indigo-100 rounded-xl px-3.5 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-bold text-slate-700"
-            >
-              {bankAccounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.bankName} - {acc.accountNumber} ({acc.accountOwner})
-                </option>
-              ))}
-              <option value="custom">✍️ Tulis Rekening Manual...</option>
-            </select>
-          </div>
-
+        <div className="bg-indigo-50/20 border border-indigo-50 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="text-[10px] font-black text-slate-500 uppercase block mb-1.5">Set Saldo Awal Hari Ini</label>
             <div className="relative">
@@ -590,12 +574,18 @@ export default function BukuMutasi({
                   const parsedVal = val ? parseInt(val, 10) : 0;
                   handleStartingBalanceChange(parsedVal);
                 }}
-                className="w-full bg-white border border-indigo-100 rounded-xl pl-9 pr-3.5 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono font-bold text-slate-700"
+                disabled={userRole !== 'OWNER'}
+                className="w-full bg-white border border-indigo-100 rounded-xl pl-9 pr-3.5 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono font-bold text-slate-700 disabled:bg-slate-100/70 disabled:text-slate-450 disabled:cursor-not-allowed"
               />
             </div>
             {sessionForStartDate && (
               <p className="text-[9px] text-indigo-600 font-bold mt-1">
                 * Sinkron dengan modal awal sesi kasir harian.
+              </p>
+            )}
+            {userRole !== 'OWNER' && (
+              <p className="text-[9px] text-rose-500 font-bold mt-1">
+                * Hanya OWNER yang dapat mengubah saldo awal.
               </p>
             )}
           </div>

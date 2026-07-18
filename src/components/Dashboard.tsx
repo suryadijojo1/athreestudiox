@@ -1326,7 +1326,7 @@ export default function Dashboard({
       )}
 
       {/* Real-time Casher Active Session Monitor */}
-      {activeSession ? (
+      {activeSession && userRole === 'OWNER' ? (
         <motion.div 
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1349,13 +1349,15 @@ export default function Dashboard({
                 Memantau laci uang fisik secara real-time berdasarkan transaksi hari ini. Kasir wajib mencocokkan uang fisik di laci agar sesuai dengan nilai <strong className="text-emerald-300 underline">Estimasi Uang Fisik</strong> di bawah ini.
               </p>
             </div>
-            <button
-              onClick={() => setActiveTab('kasir-closingan')}
-              className="self-start lg:self-auto px-5 py-3 bg-white hover:bg-indigo-50 text-indigo-950 font-extrabold rounded-2xl text-xs border-none cursor-pointer transition shadow-md uppercase tracking-wider flex items-center gap-1.5"
-            >
-              Selesaikan / Tutup Kasir
-              <ArrowUpRight className="w-4 h-4 text-indigo-950" />
-            </button>
+            {userRole === 'OWNER' && (
+              <button
+                onClick={() => setActiveTab('kasir-closingan')}
+                className="self-start lg:self-auto px-5 py-3 bg-white hover:bg-indigo-50 text-indigo-950 font-extrabold rounded-2xl text-xs border-none cursor-pointer transition shadow-md uppercase tracking-wider flex items-center gap-1.5"
+              >
+                Selesaikan / Tutup Kasir
+                <ArrowUpRight className="w-4 h-4 text-indigo-950" />
+              </button>
+            )}
           </div>
 
           {/* 4-Item Sub-Grid statistics inside the card for visual balance */}
@@ -1397,35 +1399,7 @@ export default function Dashboard({
             </div>
           </div>
         </motion.div>
-      ) : (
-        <motion.div 
-          initial={{ opacity: 0, y: -5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-5 rounded-[2rem] bg-white border-2 border-indigo-55 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm print:hidden"
-          id="no-active-session-alert"
-        >
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 flex-shrink-0">
-              <Lock className="w-5 h-5 text-indigo-500" />
-            </div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                🔒 Sesi Laci Kasir Belum Dibuka
-              </h4>
-              <p className="text-xs text-slate-400 font-semibold leading-relaxed">
-                Laci cash register masih terkunci. Harap buka sesi kasir harian agar Anda dapat melacak setoran masuk, mengelola pengeluaran laci (Cash In & Cash Out), serta mencocokkan uang fisik di akhir giliran kerja.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setActiveTab('kasir-closingan')}
-            className="w-full md:w-auto px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black rounded-2xl text-xs border-none cursor-pointer transition shadow-sm uppercase tracking-wider flex items-center justify-center gap-1.5 self-center"
-          >
-            Buka Sesi Kasir
-            <ArrowUpRight className="w-4 h-4" />
-          </button>
-        </motion.div>
-      )}
+      ) : null}
 
       {/* Kartu Ringkasan Status Produksi / Volume Kerja Aktif */}
       <motion.div 

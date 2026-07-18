@@ -51,6 +51,7 @@ export interface CashierSession {
   openedAt: string; // ISO String
   openedBy: 'OWNER' | 'KASIR';
   openingBalance: number; // Modal awal
+  closeInterval?: string; // Tutup setiap (e.g., 'SHIFT', 'DAILY', 'MANUAL')
   closedAt?: string; // ISO String
   closedBy?: 'OWNER' | 'KASIR';
   expectedCash: number; // calculated cash in drawer: openingBalance + cash_in

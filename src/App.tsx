@@ -22,7 +22,9 @@ import {
   saveShopSettingsToFirestore,
   loadShopSettingsFromFirestore,
   SystemCredentials,
-  db
+  db,
+  getIsQuotaExceeded,
+  checkQuotaError
 } from './lib/firebase';
 
 // Component imports
@@ -75,10 +77,30 @@ export default function App() {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
+  // Refs to track last successfully synced data for incremental synchronization
+  const lastSyncedProductsRef = React.useRef<Product[]>([]);
+  const lastSyncedInvoicesRef = React.useRef<Invoice[]>([]);
+  const lastSyncedMovementsRef = React.useRef<StockMovement[]>([]);
+  const lastSyncedAuditLogsRef = React.useRef<AuditLog[]>([]);
+  const lastSyncedPaymentsRef = React.useRef<PaymentTransaction[]>([]);
+  const lastSyncedHistoryRef = React.useRef<CashierSession[]>([]);
+
   // Firebase Status Tracking
   const [firebaseStatus, setFirebaseStatus] = useState<'CONNECTING' | 'CONNECTED' | 'ERROR' | 'OFFLINE'>('CONNECTING');
   const [isFirebaseSyncing, setIsFirebaseSyncing] = useState<boolean>(false);
   const [isDatabaseLoaded, setIsDatabaseLoaded] = useState<boolean>(false);
+  const [quotaExceeded, setQuotaExceeded] = useState<boolean>(() => getIsQuotaExceeded());
+
+  useEffect(() => {
+    const handleQuotaExceeded = () => {
+      setQuotaExceeded(true);
+      setFirebaseStatus('OFFLINE');
+    };
+    window.addEventListener('firestore-quota-exceeded', handleQuotaExceeded);
+    return () => {
+      window.removeEventListener('firestore-quota-exceeded', handleQuotaExceeded);
+    };
+  }, []);
 
   // Authentication State
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -139,20 +161,8 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    setIsLoggingOut(true);
-    // Explicitly guarantee all in-memory transaction states are written to cloud
-    await saveAllDataToCloud(
-      products,
-      invoices,
-      movements,
-      auditLogs,
-      paymentTransactions,
-      sessionsHistory,
-      activeSession
-    );
     setIsLoggedIn(false);
     localStorage.removeItem('athree_logged_in');
-    setIsLoggingOut(false);
   };
 
   // Navigation tab route state
@@ -369,6 +379,49 @@ export default function App() {
   // --- INITIALIZATION (Firebase Load / Local Storage Fallback) ---
   useEffect(() => {
     const loadDatabase = async () => {
+      if (quotaExceeded) {
+        setFirebaseStatus('OFFLINE');
+        const storedProducts = localStorage.getItem('nota_stok_products');
+        const storedInvoices = localStorage.getItem('nota_stok_invoices');
+        const storedMovements = localStorage.getItem('nota_stok_movements');
+        const storedAuditLogs = localStorage.getItem('nota_stok_audit_logs');
+
+        const fallbackProds = storedProducts ? JSON.parse(storedProducts) : INITIAL_PRODUCTS;
+        const fallbackInvs = storedInvoices ? JSON.parse(storedInvoices) : INITIAL_INVOICES;
+        const fallbackMoves = storedMovements ? JSON.parse(storedMovements) : INITIAL_MOVEMENTS;
+        const fallbackLogs = storedAuditLogs ? JSON.parse(storedAuditLogs) : INITIAL_AUDIT_LOGS;
+
+        setProducts(fallbackProds);
+        setInvoices(fallbackInvs);
+        setMovements(fallbackMoves);
+        setAuditLogs(fallbackLogs);
+
+        lastSyncedProductsRef.current = fallbackProds;
+        lastSyncedInvoicesRef.current = fallbackInvs;
+        lastSyncedMovementsRef.current = fallbackMoves;
+        lastSyncedAuditLogsRef.current = fallbackLogs;
+
+        const storedPayments = localStorage.getItem('nota_stok_payment_transactions');
+        if (storedPayments) {
+          const fallbackPayments = JSON.parse(storedPayments);
+          setPaymentTransactions(fallbackPayments);
+          lastSyncedPaymentsRef.current = fallbackPayments;
+        }
+
+        const storedHistory = localStorage.getItem('nota_stok_sessions_history');
+        if (storedHistory) {
+          const fallbackHistory = JSON.parse(storedHistory);
+          setSessionsHistory(fallbackHistory);
+          lastSyncedHistoryRef.current = fallbackHistory;
+        }
+
+        const storedActiveSession = localStorage.getItem('nota_stok_active_session');
+        if (storedActiveSession) setActiveSession(JSON.parse(storedActiveSession));
+
+        setIsDatabaseLoaded(true);
+        return;
+      }
+
       setFirebaseStatus('CONNECTING');
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
@@ -419,6 +472,14 @@ export default function App() {
           setSessionsHistory(dbHistory);
           setActiveSession(dbActiveSession);
 
+          // Populate lastSynced refs to avoid redundant syncing on startup
+          lastSyncedProductsRef.current = dbProducts;
+          lastSyncedInvoicesRef.current = dbInvoices;
+          lastSyncedMovementsRef.current = dbMovements;
+          lastSyncedAuditLogsRef.current = dbAuditLogs;
+          lastSyncedPaymentsRef.current = dbPayments;
+          lastSyncedHistoryRef.current = dbHistory;
+
           localStorage.setItem('nota_stok_products', JSON.stringify(dbProducts));
           localStorage.setItem('nota_stok_invoices', JSON.stringify(dbInvoices));
           localStorage.setItem('nota_stok_movements', JSON.stringify(dbMovements));
@@ -468,6 +529,12 @@ export default function App() {
           setInvoices(seedInvs);
           setMovements(seedMoves);
           setAuditLogs(seedLogs);
+
+          // Populate lastSynced refs to avoid redundant syncing on startup
+          lastSyncedProductsRef.current = seedProds;
+          lastSyncedInvoicesRef.current = seedInvs;
+          lastSyncedMovementsRef.current = seedMoves;
+          lastSyncedAuditLogsRef.current = seedLogs;
 
           localStorage.setItem('nota_stok_products', JSON.stringify(seedProds));
           localStorage.setItem('nota_stok_invoices', JSON.stringify(seedInvs));
@@ -554,6 +621,7 @@ export default function App() {
             });
           }
           setPaymentTransactions(seedPayments);
+          lastSyncedPaymentsRef.current = seedPayments;
           localStorage.setItem('nota_stok_payment_transactions', JSON.stringify(seedPayments));
           await saveCollectionInBatches('payment_transactions', seedPayments);
 
@@ -578,6 +646,7 @@ export default function App() {
             ];
           }
           setSessionsHistory(seedHistory);
+          lastSyncedHistoryRef.current = seedHistory;
           localStorage.setItem('nota_stok_sessions_history', JSON.stringify(seedHistory));
           await saveCollectionInBatches('sessions_history', seedHistory);
 
@@ -600,16 +669,34 @@ export default function App() {
         const storedMovements = localStorage.getItem('nota_stok_movements');
         const storedAuditLogs = localStorage.getItem('nota_stok_audit_logs');
 
-        setProducts(storedProducts ? JSON.parse(storedProducts) : INITIAL_PRODUCTS);
-        setInvoices(storedInvoices ? JSON.parse(storedInvoices) : INITIAL_INVOICES);
-        setMovements(storedMovements ? JSON.parse(storedMovements) : INITIAL_MOVEMENTS);
-        setAuditLogs(storedAuditLogs ? JSON.parse(storedAuditLogs) : INITIAL_AUDIT_LOGS);
+        const fallbackProds = storedProducts ? JSON.parse(storedProducts) : INITIAL_PRODUCTS;
+        const fallbackInvs = storedInvoices ? JSON.parse(storedInvoices) : INITIAL_INVOICES;
+        const fallbackMoves = storedMovements ? JSON.parse(storedMovements) : INITIAL_MOVEMENTS;
+        const fallbackLogs = storedAuditLogs ? JSON.parse(storedAuditLogs) : INITIAL_AUDIT_LOGS;
+
+        setProducts(fallbackProds);
+        setInvoices(fallbackInvs);
+        setMovements(fallbackMoves);
+        setAuditLogs(fallbackLogs);
+
+        lastSyncedProductsRef.current = fallbackProds;
+        lastSyncedInvoicesRef.current = fallbackInvs;
+        lastSyncedMovementsRef.current = fallbackMoves;
+        lastSyncedAuditLogsRef.current = fallbackLogs;
 
         const storedPayments = localStorage.getItem('nota_stok_payment_transactions');
-        if (storedPayments) setPaymentTransactions(JSON.parse(storedPayments));
+        if (storedPayments) {
+          const fallbackPayments = JSON.parse(storedPayments);
+          setPaymentTransactions(fallbackPayments);
+          lastSyncedPaymentsRef.current = fallbackPayments;
+        }
 
         const storedHistory = localStorage.getItem('nota_stok_sessions_history');
-        if (storedHistory) setSessionsHistory(JSON.parse(storedHistory));
+        if (storedHistory) {
+          const fallbackHistory = JSON.parse(storedHistory);
+          setSessionsHistory(fallbackHistory);
+          lastSyncedHistoryRef.current = fallbackHistory;
+        }
 
         const storedActiveSession = localStorage.getItem('nota_stok_active_session');
         if (storedActiveSession) setActiveSession(JSON.parse(storedActiveSession));
@@ -624,7 +711,7 @@ export default function App() {
 
   // --- REAL-TIME FIRESTORE MULTI-DEVICE SYNCHRONIZATION ---
   useEffect(() => {
-    if (!isDatabaseLoaded) return;
+    if (!isDatabaseLoaded || quotaExceeded) return;
 
     // Listen to 'products' collection
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
@@ -819,7 +906,7 @@ export default function App() {
           const loadedInvoices = JSON.parse(storedInvoices);
           setInvoices(loadedInvoices);
           if (firebaseStatus === 'CONNECTED') {
-            saveCollectionInBatches('invoices', loadedInvoices).catch((e) => {
+            syncIncrementalToFirestore('invoices', loadedInvoices, lastSyncedInvoicesRef).catch((e) => {
               console.error("Gagal sinkronisasi invoices ke firestore:", e);
             });
           }
@@ -882,6 +969,49 @@ export default function App() {
     };
   }, [firebaseStatus]);
 
+  // Highly-optimized Incremental Sync to keep Firestore write counts minimal and prevent exceeding daily free quotas
+  const syncIncrementalToFirestore = async <T extends { id: string }>(
+    collectionName: string,
+    newItems: T[],
+    lastSyncedRef: React.MutableRefObject<T[]>
+  ) => {
+    try {
+      const oldItems = lastSyncedRef.current || [];
+      
+      // 1. Identify added or modified items
+      const toSync = newItems.filter(item => {
+        const matchingOld = oldItems.find(o => o.id === item.id);
+        if (!matchingOld) return true; // Added
+        return JSON.stringify(matchingOld) !== JSON.stringify(item); // Modified
+      });
+
+      // 2. Identify deleted items
+      const toDelete = oldItems.filter(item => !newItems.some(n => n.id === item.id));
+
+      // 3. Perform Firestore operations
+      if (toSync.length > 0) {
+        await saveCollectionInBatches(collectionName, toSync);
+      }
+      for (const item of toDelete) {
+        await deleteDocumentFromFirestore(collectionName, item.id);
+      }
+
+      // 4. Update ref on success
+      lastSyncedRef.current = [...newItems];
+    } catch (err: any) {
+      console.warn(`Gagal melakukan incremental sync ke Firestore untuk ${collectionName}:`, err);
+      if (
+        err?.message?.includes('quota') || 
+        err?.message?.includes('Quota') || 
+        err?.message?.includes('resource-exhausted') || 
+        err?.message?.includes('EXCEEDED') ||
+        err?.message?.includes('Quota limit exceeded')
+      ) {
+        setFirebaseStatus('OFFLINE');
+      }
+    }
+  };
+
   // Sync state changes with physical browser storage on mutation + CLOUD FIRESTORE SYNC
   const syncToLocalStorage = (
     newProds: Product[], 
@@ -910,20 +1040,29 @@ export default function App() {
       if (refreshed) setSelectedInvoice(refreshed);
     }
 
-    // Trigger Cloud Firestore Sync in background
+    // Trigger Cloud Firestore Sync in background using optimized incremental sync
+    if (quotaExceeded) {
+      if (firebaseStatus !== 'OFFLINE') {
+        setFirebaseStatus('OFFLINE');
+      }
+      setIsFirebaseSyncing(false);
+      return;
+    }
+
     setIsFirebaseSyncing(true);
     const syncPromises = [
-      saveCollectionInBatches('products', newProds),
-      saveCollectionInBatches('invoices', newInvs),
-      saveCollectionInBatches('movements', newMoves)
+      syncIncrementalToFirestore('products', newProds, lastSyncedProductsRef),
+      syncIncrementalToFirestore('invoices', newInvs, lastSyncedInvoicesRef),
+      syncIncrementalToFirestore('movements', newMoves, lastSyncedMovementsRef)
     ];
     if (newLogs) {
-      syncPromises.push(saveCollectionInBatches('audit_logs', newLogs));
+      syncPromises.push(syncIncrementalToFirestore('audit_logs', newLogs, lastSyncedAuditLogsRef));
     }
     
     Promise.all(syncPromises)
       .then(() => {
-        setFirebaseStatus('CONNECTED');
+        // If we succeeded and weren't previously set to OFFLINE due to a quota error, keep CONNECTED
+        setFirebaseStatus(prev => (prev === 'OFFLINE' && lastSyncedProductsRef.current.length === 0) ? 'OFFLINE' : 'CONNECTED');
       })
       .catch((err) => {
         console.error("Gagal melakukan background sync ke Firestore:", err);
@@ -935,17 +1074,33 @@ export default function App() {
 
   // --- REAL-TIME FIRESTORE SYNCHRONIZATION FOR AUXILIARY STATE ---
   useEffect(() => {
-    if (!isDatabaseLoaded || firebaseStatus === 'CONNECTING') return;
+    if (!isDatabaseLoaded || firebaseStatus === 'CONNECTING' || quotaExceeded) {
+      if (quotaExceeded && firebaseStatus !== 'OFFLINE') {
+        setFirebaseStatus('OFFLINE');
+      }
+      return;
+    }
 
     const syncAuxiliaryData = async () => {
       setIsFirebaseSyncing(true);
       try {
-        await saveCollectionInBatches('payment_transactions', paymentTransactions);
-        await saveCollectionInBatches('sessions_history', sessionsHistory);
+        await syncIncrementalToFirestore('payment_transactions', paymentTransactions, lastSyncedPaymentsRef);
+        await syncIncrementalToFirestore('sessions_history', sessionsHistory, lastSyncedHistoryRef);
         await saveActiveSessionToFirestore(activeSession);
-        setFirebaseStatus('CONNECTED');
-      } catch (e) {
+        // Do not force CONNECTED if quota has been exceeded previously
+        setFirebaseStatus(prev => prev === 'OFFLINE' ? 'OFFLINE' : 'CONNECTED');
+      } catch (e: any) {
+        checkQuotaError(e);
         console.error("Gagal sinkronisasi data sekunder ke Firestore:", e);
+        if (
+          e?.message?.includes('quota') || 
+          e?.message?.includes('Quota') || 
+          e?.message?.includes('resource-exhausted') || 
+          e?.message?.includes('EXCEEDED') ||
+          e?.message?.includes('Quota limit exceeded')
+        ) {
+          setFirebaseStatus('OFFLINE');
+        }
       } finally {
         setIsFirebaseSyncing(false);
       }
@@ -1210,13 +1365,14 @@ export default function App() {
     syncToLocalStorage(products, nextInvoices, movements, nextLogs);
   };
 
-  const handleOpenSession = async (openingBalance: number, cashier: 'OWNER' | 'KASIR') => {
+  const handleOpenSession = async (openingBalance: number, cashier: 'OWNER' | 'KASIR', closeInterval?: string) => {
     const newSession: CashierSession = {
       id: `sess-${Date.now()}`,
       openedAt: new Date().toISOString(),
       openedBy: cashier,
       openingBalance: openingBalance,
       expectedCash: openingBalance,
+      closeInterval: closeInterval || 'DAILY',
       status: 'OPEN'
     };
     setActiveSession(newSession);
@@ -1241,7 +1397,7 @@ export default function App() {
       setIsFirebaseSyncing(true);
       await Promise.all([
         saveActiveSessionToFirestore(newSession),
-        saveCollectionInBatches('audit_logs', nextLogs)
+        syncIncrementalToFirestore('audit_logs', nextLogs, lastSyncedAuditLogsRef)
       ]);
       setFirebaseStatus('CONNECTED');
     } catch (e) {
@@ -1291,8 +1447,8 @@ export default function App() {
       setIsFirebaseSyncing(true);
       await Promise.all([
         saveActiveSessionToFirestore(null),
-        saveCollectionInBatches('sessions_history', nextHistory),
-        saveCollectionInBatches('audit_logs', nextLogs)
+        syncIncrementalToFirestore('sessions_history', nextHistory, lastSyncedHistoryRef),
+        syncIncrementalToFirestore('audit_logs', nextLogs, lastSyncedAuditLogsRef)
       ]);
       setFirebaseStatus('CONNECTED');
     } catch (e) {
@@ -1333,7 +1489,7 @@ export default function App() {
       setIsFirebaseSyncing(true);
       await Promise.all([
         saveActiveSessionToFirestore(updatedSession),
-        saveCollectionInBatches('audit_logs', nextLogs)
+        syncIncrementalToFirestore('audit_logs', nextLogs, lastSyncedAuditLogsRef)
       ]);
       setFirebaseStatus('CONNECTED');
     } catch (e) {
@@ -1365,8 +1521,8 @@ export default function App() {
     try {
       setIsFirebaseSyncing(true);
       await Promise.all([
-        saveCollectionInBatches('sessions_history', updated),
-        saveCollectionInBatches('audit_logs', nextLogs)
+        syncIncrementalToFirestore('sessions_history', updated, lastSyncedHistoryRef),
+        syncIncrementalToFirestore('audit_logs', nextLogs, lastSyncedAuditLogsRef)
       ]);
       setFirebaseStatus('CONNECTED');
     } catch (e) {
@@ -1967,7 +2123,7 @@ export default function App() {
     // Also sync payment transactions in background
     setIsFirebaseSyncing(true);
     try {
-      await saveCollectionInBatches('payment_transactions', seedPayments);
+      await syncIncrementalToFirestore('payment_transactions', seedPayments, lastSyncedPaymentsRef);
     } catch (e) {
       console.error("Gagal sync payment_transactions ke Firestore:", e);
     } finally {
@@ -2025,7 +2181,13 @@ export default function App() {
                           : 'bg-rose-500'
                     }`} />
                     <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1">
-                      {firebaseStatus === 'CONNECTED' ? 'Cloud: Online' : firebaseStatus === 'CONNECTING' ? 'Cloud: Connecting' : 'Cloud: Offline'}
+                      {quotaExceeded 
+                        ? 'Cloud: Offline (Quota Exceeded)' 
+                        : firebaseStatus === 'CONNECTED' 
+                          ? 'Cloud: Online' 
+                          : firebaseStatus === 'CONNECTING' 
+                            ? 'Cloud: Connecting' 
+                            : 'Cloud: Offline'}
                       {isFirebaseSyncing && <span className="animate-spin text-indigo-500 shrink-0">⌛</span>}
                     </span>
                   </div>
@@ -2172,7 +2334,7 @@ export default function App() {
               )}
 
               {/* Rekap Kasir & Closingan */}
-              {userRole !== 'PRODUKSI' && (
+              {userRole === 'OWNER' && (
                 <button
                   id="tab-cash-drawer"
                   onClick={() => setActiveTab('kasir-closingan')}
@@ -2288,6 +2450,31 @@ export default function App() {
           }`} 
           id="app-workspace-main"
         >
+          {quotaExceeded && (
+            <div className="mb-6 p-4 rounded-2xl border border-amber-100 bg-amber-50/75 dark:bg-amber-950/20 dark:border-amber-900/30 text-amber-800 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs animate-in fade-in slide-in-from-top-4 duration-300" id="quota-exceeded-alert-banner">
+              <div className="flex gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold tracking-tight">Koneksi Cloud Ditangguhkan (Kuota Firestore Terpenuhi)</h3>
+                  <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-0.5 leading-relaxed">
+                    Batas tulis harian database cloud gratis Anda telah terpenuhi. <strong>Seluruh data Anda aman dan otomatis disimpan di LocalStorage browser ini</strong>. Sistem tetap berfungsi penuh secara offline, dan akan melakukan sinkronisasi otomatis ketika kuota harian di-reset oleh Firebase atau saat Anda meng-upgrade paket Firebase Anda.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('athree_firestore_quota_exceeded');
+                  window.location.reload();
+                }}
+                className="self-start sm:self-center shrink-0 px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition shadow-xs shadow-amber-600/10 hover:shadow-amber-600/20 cursor-pointer"
+              >
+                Coba Hubungkan Kembali
+              </button>
+            </div>
+          )}
           
           {/* Dynamic tabs render switch routing */}
           {activeTab === 'dashboard' && (
@@ -2367,7 +2554,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'kasir-closingan' && (
+          {activeTab === 'kasir-closingan' && userRole === 'OWNER' && (
             <KasirSesiPanel
               paymentTransactions={paymentTransactions}
               activeSession={activeSession}

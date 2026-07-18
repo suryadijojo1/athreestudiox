@@ -6,7 +6,8 @@ import {
   setDoc, 
   doc, 
   writeBatch,
-  deleteDoc
+  deleteDoc,
+  disableNetwork
 } from 'firebase/firestore';
 import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession, SalesAgent, ShopSettings } from '../types';
 
@@ -22,6 +23,44 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, "ai-studio-945047af-229e-4c44-9dd5-a88cc1aef953");
+
+// Quota & Offline Status Tracking
+export let isQuotaExceeded = typeof localStorage !== 'undefined' && localStorage.getItem('athree_firestore_quota_exceeded') === 'true';
+
+if (isQuotaExceeded) {
+  disableNetwork(db).catch((e) => {
+    console.warn('Gagal mematikan koneksi Firestore network pada load:', e);
+  });
+}
+
+export function getIsQuotaExceeded(): boolean {
+  return isQuotaExceeded;
+}
+
+export function checkQuotaError(error: unknown): boolean {
+  const errStr = error instanceof Error ? error.message : String(error);
+  if (
+    errStr.includes('resource-exhausted') || 
+    errStr.includes('quota') || 
+    errStr.includes('Quota') || 
+    errStr.includes('EXCEEDED') ||
+    errStr.includes('Quota limit exceeded')
+  ) {
+    if (!isQuotaExceeded) {
+      isQuotaExceeded = true;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('athree_firestore_quota_exceeded', 'true');
+      }
+      window.dispatchEvent(new Event('firestore-quota-exceeded'));
+      console.warn('Firestore daily write quota limit has been exceeded! Switched to offline localStorage mode gracefully.');
+      disableNetwork(db).catch((e) => {
+        console.warn('Gagal mematikan koneksi Firestore network:', e);
+      });
+    }
+    return true;
+  }
+  return false;
+}
 
 // ERROR HANDLING ENGINE REQUIRED BY FIRESTORE SYSTEM SKILL
 export enum OperationType {
@@ -65,6 +104,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 // Generic helpers to load a collection
 export async function loadCollectionFromFirestore<T>(collectionName: string): Promise<T[]> {
+  if (isQuotaExceeded) {
+    throw new Error('Quota limit exceeded');
+  }
   try {
     const colRef = collection(db, collectionName);
     const snapshot = await getDocs(colRef);
@@ -74,6 +116,7 @@ export async function loadCollectionFromFirestore<T>(collectionName: string): Pr
     });
     return items;
   } catch (error) {
+    checkQuotaError(error);
     console.error(`Gagal muat data ${collectionName} dari Firebase:`, error);
     handleFirestoreError(error, OperationType.GET, collectionName);
   }
@@ -101,10 +144,17 @@ export function cleanUndefined<T>(obj: T): any {
 
 // Generic helper to save a document
 export async function saveDocumentToFirestore<T extends { id: string }>(collectionName: string, item: T): Promise<void> {
+  if (isQuotaExceeded) {
+    console.log(`[Offline Mode] Skipping saveDocumentToFirestore for ${collectionName}/${item.id} due to quota limit.`);
+    return;
+  }
   try {
     const docRef = doc(db, collectionName, item.id);
     await setDoc(docRef, cleanUndefined(item));
   } catch (error) {
+    if (checkQuotaError(error)) {
+      return;
+    }
     console.error(`Gagal simpan data ${collectionName}/${item.id} ke Firebase:`, error);
     handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${item.id}`);
   }
@@ -112,10 +162,17 @@ export async function saveDocumentToFirestore<T extends { id: string }>(collecti
 
 // Generic helper to delete a document
 export async function deleteDocumentFromFirestore(collectionName: string, id: string): Promise<void> {
+  if (isQuotaExceeded) {
+    console.log(`[Offline Mode] Skipping deleteDocumentFromFirestore for ${collectionName}/${id} due to quota limit.`);
+    return;
+  }
   try {
     const docRef = doc(db, collectionName, id);
     await deleteDoc(docRef);
   } catch (error) {
+    if (checkQuotaError(error)) {
+      return;
+    }
     console.error(`Gagal hapus data ${collectionName}/${id} dari Firebase:`, error);
     handleFirestoreError(error, OperationType.DELETE, `${collectionName}/${id}`);
   }
@@ -123,6 +180,10 @@ export async function deleteDocumentFromFirestore(collectionName: string, id: st
 
 // Generic helper to upload entire lists using Firestore Batches (up to 500 documents per batch)
 export async function saveCollectionInBatches<T extends { id: string }>(collectionName: string, items: T[]): Promise<void> {
+  if (isQuotaExceeded) {
+    console.log(`[Offline Mode] Skipping saveCollectionInBatches for ${collectionName} due to quota limit.`);
+    return;
+  }
   try {
     let batch = writeBatch(db);
     let count = 0;
@@ -143,6 +204,9 @@ export async function saveCollectionInBatches<T extends { id: string }>(collecti
       await batch.commit();
     }
   } catch (error) {
+    if (checkQuotaError(error)) {
+      return;
+    }
     console.error(`Gagal melakukan batch-save untuk ${collectionName}:`, error);
     handleFirestoreError(error, OperationType.WRITE, collectionName);
   }
@@ -150,16 +214,26 @@ export async function saveCollectionInBatches<T extends { id: string }>(collecti
 
 // Helpers specifically for Active Session
 export async function saveActiveSessionToFirestore(session: CashierSession | null): Promise<void> {
+  if (isQuotaExceeded) {
+    console.log(`[Offline Mode] Skipping saveActiveSessionToFirestore due to quota limit.`);
+    return;
+  }
   try {
     const docRef = doc(db, 'metadata', 'active_session');
     await setDoc(docRef, cleanUndefined({ activeSession: session }));
   } catch (error) {
+    if (checkQuotaError(error)) {
+      return;
+    }
     console.error('Gagal simpan activeSession ke Firebase:', error);
     handleFirestoreError(error, OperationType.WRITE, 'metadata/active_session');
   }
 }
 
 export async function loadActiveSessionFromFirestore(): Promise<CashierSession | null> {
+  if (isQuotaExceeded) {
+    throw new Error('Quota limit exceeded');
+  }
   try {
     const docRef = doc(db, 'metadata', 'active_session');
     const docSnap = await getDocs(collection(db, 'metadata'));
@@ -172,6 +246,7 @@ export async function loadActiveSessionFromFirestore(): Promise<CashierSession |
     });
     return activeSession;
   } catch (error) {
+    checkQuotaError(error);
     console.error('Gagal memuat activeSession dari Firebase:', error);
     handleFirestoreError(error, OperationType.GET, 'metadata/active_session');
   }
@@ -185,16 +260,26 @@ export interface SystemCredentials {
 }
 
 export async function saveCredentialsToFirestore(creds: SystemCredentials): Promise<void> {
+  if (isQuotaExceeded) {
+    console.log(`[Offline Mode] Skipping saveCredentialsToFirestore due to quota limit.`);
+    return;
+  }
   try {
     const docRef = doc(db, 'metadata', 'credentials');
     await setDoc(docRef, cleanUndefined(creds));
   } catch (error) {
+    if (checkQuotaError(error)) {
+      return;
+    }
     console.error('Gagal simpan credentials ke Firebase:', error);
     handleFirestoreError(error, OperationType.WRITE, 'metadata/credentials');
   }
 }
 
 export async function loadCredentialsFromFirestore(): Promise<SystemCredentials | null> {
+  if (isQuotaExceeded) {
+    throw new Error('Quota limit exceeded');
+  }
   try {
     const docSnap = await getDocs(collection(db, 'metadata'));
     let credentials: SystemCredentials | null = null;
@@ -211,22 +296,33 @@ export async function loadCredentialsFromFirestore(): Promise<SystemCredentials 
     });
     return credentials;
   } catch (error) {
+    checkQuotaError(error);
     console.error('Gagal memuat credentials dari Firebase:', error);
     handleFirestoreError(error, OperationType.GET, 'metadata/credentials');
   }
 }
 
 export async function saveSalesAgentsToFirestore(agents: SalesAgent[]): Promise<void> {
+  if (isQuotaExceeded) {
+    console.log(`[Offline Mode] Skipping saveSalesAgentsToFirestore due to quota limit.`);
+    return;
+  }
   try {
     const docRef = doc(db, 'metadata', 'sales_agents');
     await setDoc(docRef, cleanUndefined({ id: 'sales_agents', agents }));
   } catch (error) {
+    if (checkQuotaError(error)) {
+      return;
+    }
     console.error('Gagal simpan sales_agents ke Firebase:', error);
     handleFirestoreError(error, OperationType.WRITE, 'metadata/sales_agents');
   }
 }
 
 export async function loadSalesAgentsFromFirestore(): Promise<SalesAgent[] | null> {
+  if (isQuotaExceeded) {
+    throw new Error('Quota limit exceeded');
+  }
   try {
     const docSnap = await getDocs(collection(db, 'metadata'));
     let agents: SalesAgent[] | null = null;
@@ -238,6 +334,7 @@ export async function loadSalesAgentsFromFirestore(): Promise<SalesAgent[] | nul
     });
     return agents;
   } catch (error) {
+    checkQuotaError(error);
     console.warn('Gagal memuat sales_agents dari Firebase:', error);
     // Return null so we can fallback to defaults gracefully
     return null;
@@ -245,16 +342,26 @@ export async function loadSalesAgentsFromFirestore(): Promise<SalesAgent[] | nul
 }
 
 export async function saveShopSettingsToFirestore(settings: ShopSettings): Promise<void> {
+  if (isQuotaExceeded) {
+    console.log(`[Offline Mode] Skipping saveShopSettingsToFirestore due to quota limit.`);
+    return;
+  }
   try {
     const docRef = doc(db, 'metadata', 'shop_settings');
     await setDoc(docRef, cleanUndefined({ id: 'shop_settings', ...settings }));
   } catch (error) {
+    if (checkQuotaError(error)) {
+      return;
+    }
     console.error('Gagal simpan shop_settings ke Firebase:', error);
     handleFirestoreError(error, OperationType.WRITE, 'metadata/shop_settings');
   }
 }
 
 export async function loadShopSettingsFromFirestore(): Promise<ShopSettings | null> {
+  if (isQuotaExceeded) {
+    throw new Error('Quota limit exceeded');
+  }
   try {
     const docSnap = await getDocs(collection(db, 'metadata'));
     let settings: ShopSettings | null = null;
@@ -272,6 +379,7 @@ export async function loadShopSettingsFromFirestore(): Promise<ShopSettings | nu
     });
     return settings;
   } catch (error) {
+    checkQuotaError(error);
     console.warn('Gagal memuat shop_settings dari Firebase:', error);
     return null;
   }
