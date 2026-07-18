@@ -28,6 +28,7 @@ interface BukuMutasiProps {
   userRole: string;
   activeSession?: CashierSession | null;
   sessionsHistory?: CashierSession[];
+  onUpdateSessionOpeningBalance?: (newBalance: number) => void;
 }
 
 interface BankAccount {
@@ -44,7 +45,8 @@ export default function BukuMutasi({
   onDeleteCustomTransaction,
   userRole,
   activeSession = null,
-  sessionsHistory = []
+  sessionsHistory = [],
+  onUpdateSessionOpeningBalance
 }: BukuMutasiProps) {
   // Load registered bank accounts
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(() => {
@@ -75,7 +77,7 @@ export default function BukuMutasi({
   const todayStr = new Date().toISOString().split('T')[0];
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(todayStr);
-  const [selectedMethod, setSelectedMethod] = useState<'ALL' | 'TRANSFER' | 'CASH'>('TRANSFER');
+  const [selectedMethod, setSelectedMethod] = useState<'ALL' | 'TRANSFER' | 'CASH'>('ALL');
   const [startingBalance, setStartingBalance] = useState<number>(() => {
     const saved = localStorage.getItem('athree_mutasi_starting_balance');
     return saved ? Number(saved) : 782890318;
@@ -154,13 +156,18 @@ export default function BukuMutasi({
     return matchedSession || null;
   }, [activeSession, sessionsHistory, startDate]);
 
-  // Determine starting balance based on method selection (CASH uses opening balance, TRANSFER uses user-configured balance)
+  // Determine starting balance: prioritize laci kas session opening balance, otherwise fallback to startingBalance
   const effectiveStartingBalance = useMemo(() => {
-    if (selectedMethod === 'CASH') {
-      return sessionForStartDate ? sessionForStartDate.openingBalance : 0;
+    return sessionForStartDate ? sessionForStartDate.openingBalance : startingBalance;
+  }, [sessionForStartDate, startingBalance]);
+
+  const handleStartingBalanceChange = (newVal: number) => {
+    setStartingBalance(newVal);
+    const todayStrValue = new Date().toISOString().split('T')[0];
+    if (startDate === todayStrValue && activeSession && onUpdateSessionOpeningBalance) {
+      onUpdateSessionOpeningBalance(newVal);
     }
-    return startingBalance;
-  }, [selectedMethod, sessionForStartDate, startingBalance]);
+  };
 
   // Saving settings inside local storage
   useEffect(() => {
@@ -251,12 +258,9 @@ export default function BukuMutasi({
       const isTransfer = tx.method === 'TRANSFER';
       const amount = tx.amount;
 
-      // Update rolling balance based on current method filter context
-      const affectsBalance = selectedMethod === 'ALL' 
-        ? true 
-        : (selectedMethod === 'CASH' ? !isTransfer : isTransfer);
-
-      if (affectsBalance) {
+      // Update rolling balance based on user requirement:
+      // - Transfer transactions (both debit and credit) do not affect the total balance
+      if (!isTransfer) {
         if (isDebit) {
           currentBal -= amount;
         } else {
@@ -301,6 +305,39 @@ export default function BukuMutasi({
       };
     });
   }, [paymentTransactions, startDate, endDate, selectedMethod, effectiveStartingBalance]);
+
+  // Comprehensive daily summary calculation for starting balance, incomes, expenses, for both transfer & cash
+  const summaryDetails = useMemo(() => {
+    const txsInPeriod = paymentTransactions.filter(tx => {
+      const txDate = tx.timestamp.split('T')[0];
+      return txDate >= startDate && txDate <= endDate;
+    });
+
+    const incomeTransfer = txsInPeriod
+      .filter(tx => tx.type !== 'PENGELUARAN' && tx.method === 'TRANSFER')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const incomeCash = txsInPeriod
+      .filter(tx => tx.type !== 'PENGELUARAN' && tx.method === 'CASH')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const expenseTransfer = txsInPeriod
+      .filter(tx => tx.type === 'PENGELUARAN' && tx.method === 'TRANSFER')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const expenseCash = txsInPeriod
+      .filter(tx => tx.type === 'PENGELUARAN' && tx.method === 'CASH')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+    return {
+      incomeTransfer,
+      incomeCash,
+      expenseTransfer,
+      expenseCash,
+      totalIncome: incomeTransfer + incomeCash,
+      totalExpense: expenseTransfer + expenseCash,
+    };
+  }, [paymentTransactions, startDate, endDate]);
 
   // Handle form submission for manual mutation
   const handleSubmitManualMutation = (e: React.FormEvent) => {
@@ -547,22 +584,18 @@ export default function BukuMutasi({
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
               <input
                 type="text"
-                value={(selectedMethod === 'CASH' ? effectiveStartingBalance : startingBalance).toLocaleString('id-ID')}
+                value={effectiveStartingBalance.toLocaleString('id-ID')}
                 onChange={(e) => {
-                  if (selectedMethod !== 'CASH') {
-                    const val = e.target.value.replace(/[^0-9]/g, '');
-                    setStartingBalance(val ? parseInt(val, 10) : 0);
-                  }
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  const parsedVal = val ? parseInt(val, 10) : 0;
+                  handleStartingBalanceChange(parsedVal);
                 }}
-                disabled={selectedMethod === 'CASH'}
-                className={`w-full border border-indigo-100 rounded-xl pl-9 pr-3.5 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono font-bold text-slate-700 ${
-                  selectedMethod === 'CASH' ? 'bg-slate-50 cursor-not-allowed text-slate-400' : 'bg-white'
-                }`}
+                className="w-full bg-white border border-indigo-100 rounded-xl pl-9 pr-3.5 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono font-bold text-slate-700"
               />
             </div>
-            {selectedMethod === 'CASH' && (
-              <p className="text-[9px] text-slate-400 font-medium mt-1">
-                * Diambil otomatis dari modal awal sesi kasir harian.
+            {sessionForStartDate && (
+              <p className="text-[9px] text-indigo-600 font-bold mt-1">
+                * Sinkron dengan modal awal sesi kasir harian.
               </p>
             )}
           </div>
@@ -656,32 +689,85 @@ export default function BukuMutasi({
         </div>
 
         {/* Info Grid Card */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 border border-slate-100 p-5 rounded-2xl text-xs font-medium text-slate-600 mt-4">
-          <div className="space-y-1.5">
-            <div className="flex">
-              <span className="w-32 inline-block font-bold">Nomor Rekening</span>
-              <span className="px-2 text-slate-400">:</span>
-              <span className="font-extrabold text-slate-800">{activeAccount.accountNumber}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 border border-slate-100 p-5 rounded-2xl text-xs font-medium text-slate-600 mt-4">
+          <div className="flex items-center">
+            <span className="w-32 inline-block font-bold text-slate-500">Periode</span>
+            <span className="px-2 text-slate-400">:</span>
+            <span className="font-extrabold text-slate-800">
+              {formatDateDisplay(startDate)} - {formatDateDisplay(endDate)}
+            </span>
+          </div>
+          <div className="flex items-center">
+            <span className="w-32 inline-block font-bold text-slate-500">Mata Uang</span>
+            <span className="px-2 text-slate-400">:</span>
+            <span className="font-extrabold text-slate-800">IDR</span>
+          </div>
+        </div>
+
+        {/* --- DETAILED DAILY MUTASI SUMMARY WIDGET --- */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4" id="buku-mutasi-breakdown-panel">
+          {/* 1. Saldo Awal */}
+          <div className="bg-indigo-50/35 border border-indigo-100/50 rounded-2xl p-4 flex flex-col justify-between">
+            <div>
+              <span className="text-[9.5px] font-black uppercase text-indigo-550 tracking-wider">Saldo Awal</span>
+              <div className="text-sm font-black font-mono text-slate-800 mt-1">
+                {formatRp(effectiveStartingBalance)}
+              </div>
             </div>
-            <div className="flex">
-              <span className="w-32 inline-block font-bold">Nama Pemilik</span>
-              <span className="px-2 text-slate-400">:</span>
-              <span className="font-extrabold text-slate-800">{activeAccount.accountOwner}</span>
+            <div className="text-[9.5px] text-slate-400 mt-3 font-semibold flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+              {selectedMethod === 'CASH' ? 'Modal Kas Laci' : 'Rekening Bank / Custom'}
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex">
-              <span className="w-32 inline-block font-bold">Periode</span>
-              <span className="px-2 text-slate-400">:</span>
-              <span className="font-extrabold text-slate-800">
-                {formatDateDisplay(startDate)} - {formatDateDisplay(endDate)}
+          {/* 2. Total Pemasukan */}
+          <div className="bg-emerald-50/35 border border-emerald-100/50 rounded-2xl p-4 flex flex-col justify-between">
+            <div>
+              <span className="text-[9.5px] font-black uppercase text-emerald-600 tracking-wider flex items-center gap-1">
+                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
+                Pemasukan (CR)
               </span>
+              <div className="text-sm font-black font-mono text-emerald-700 mt-1">
+                {formatRp(summaryDetails.totalIncome)}
+              </div>
             </div>
-            <div className="flex">
-              <span className="w-32 inline-block font-bold">Mata Uang</span>
-              <span className="px-2 text-slate-400">:</span>
-              <span className="font-extrabold text-slate-800">IDR</span>
+            <div className="flex justify-between items-center text-[9px] text-slate-550 mt-3 pt-1.5 border-t border-dashed border-emerald-100/50 font-semibold font-sans">
+              <span className="flex items-center gap-0.5">🏦 {formatRp(summaryDetails.incomeTransfer)}</span>
+              <span className="flex items-center gap-0.5">💵 {formatRp(summaryDetails.incomeCash)}</span>
+            </div>
+          </div>
+
+          {/* 3. Total Pengeluaran */}
+          <div className="bg-rose-50/35 border border-rose-100/50 rounded-2xl p-4 flex flex-col justify-between">
+            <div>
+              <span className="text-[9.5px] font-black uppercase text-rose-600 tracking-wider flex items-center gap-1">
+                <ArrowDownRight className="w-3.5 h-3.5 text-rose-500" />
+                Pengeluaran (DB)
+              </span>
+              <div className="text-sm font-black font-mono text-rose-700 mt-1">
+                {formatRp(summaryDetails.totalExpense)}
+              </div>
+            </div>
+            <div className="flex justify-between items-center text-[9px] text-slate-550 mt-3 pt-1.5 border-t border-dashed border-rose-100/50 font-semibold font-sans">
+              <span className="flex items-center gap-0.5">🏦 {formatRp(summaryDetails.expenseTransfer)}</span>
+              <span className="flex items-center gap-0.5">💵 {formatRp(summaryDetails.expenseCash)}</span>
+            </div>
+          </div>
+
+          {/* 4. Saldo Akhir */}
+          <div className="bg-slate-900 text-white rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+            <div>
+              <span className="text-[9.5px] font-black uppercase text-indigo-300 tracking-wider">Saldo Akhir</span>
+              <div className="text-sm font-black font-mono text-white mt-1">
+                {mutations.length > 0 
+                  ? formatRp(mutations[mutations.length - 1].rawBalance)
+                  : formatRp(effectiveStartingBalance)
+                }
+              </div>
+            </div>
+            <div className="text-[9.5px] text-indigo-200 mt-3 font-semibold flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
+              Proyeksi Saldo Terhitung
             </div>
           </div>
         </div>
@@ -693,8 +779,9 @@ export default function BukuMutasi({
               <tr className="bg-slate-50 border-b-2 border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                 <th className="px-4 py-3 w-20">TGL/WAKTU</th>
                 <th className="px-4 py-3">KETERANGAN</th>
-                <th className="px-4 py-3 text-right w-44">MUTASI (CR/DB)</th>
-                <th className="px-4 py-3 text-right w-44">TOTAL SALDO</th>
+                <th className="px-4 py-3 text-right w-36">DEBIT</th>
+                <th className="px-4 py-3 text-right w-36">KREDIT</th>
+                <th className="px-4 py-3 text-right w-36">TOTAL SALDO</th>
                 <th className="px-3 py-3 text-center w-12 print:hidden">AKSI</th>
               </tr>
             </thead>
@@ -704,6 +791,7 @@ export default function BukuMutasi({
                 <td className="px-4 py-2 font-mono text-[11px]">-</td>
                 <td className="px-4 py-2 text-slate-400 italic">SALDO AWAL SEBELUM TRANSAKSI</td>
                 <td className="px-4 py-2 text-right text-slate-400">-</td>
+                <td className="px-4 py-2 text-right text-slate-400">-</td>
                 <td className="px-4 py-2 text-right font-mono text-[11px] font-bold text-slate-700">
                   {effectiveStartingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
@@ -712,7 +800,7 @@ export default function BukuMutasi({
 
               {mutations.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-slate-400 italic font-semibold">
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400 italic font-semibold">
                     Tidak ada transaksi mutasi keuangan yang terdeteksi untuk kriteria filter periode ini.
                   </td>
                 </tr>
@@ -731,11 +819,13 @@ export default function BukuMutasi({
                       <td className="px-4 py-3 align-top whitespace-pre-line leading-relaxed text-slate-700">
                         {mut.description}
                       </td>
-                      {/* Combined MUTASI column */}
-                      <td className={`px-4 py-3 text-right font-mono text-[11px] font-bold align-top ${
-                        (mut.isDebit && !mut.isTransfer) ? 'text-rose-650' : 'text-emerald-650'
-                      }`}>
-                        {(mut.isDebit && !mut.isTransfer) ? '-' : '+'}{mut.amountFormatted} {(!mut.isDebit || mut.isTransfer) ? 'CR' : 'DB'}
+                      {/* Debit Column (all types of expenses/pengeluaran) */}
+                      <td className="px-4 py-3 text-right font-mono text-[11px] font-bold align-top text-rose-650">
+                        {mut.isDebit ? mut.amountFormatted : '-'}
+                      </td>
+                      {/* Credit Column (all types of incomes/pemasukan) */}
+                      <td className="px-4 py-3 text-right font-mono text-[11px] font-bold align-top text-emerald-650">
+                        {!mut.isDebit ? mut.amountFormatted : '-'}
                       </td>
                       {/* Total Saldo Column */}
                       <td className="px-4 py-3 text-right font-mono text-[11px] font-bold align-top text-slate-700">

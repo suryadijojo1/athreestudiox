@@ -2392,6 +2392,7 @@ export default function App() {
               userRole={userRole}
               activeSession={activeSession}
               sessionsHistory={sessionsHistory}
+              onUpdateSessionOpeningBalance={handleUpdateSessionOpeningBalance}
             />
           )}
 
