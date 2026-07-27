@@ -96,7 +96,8 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
     const saved = localStorage.getItem('athree_sales_agents');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
     return [
@@ -112,7 +113,10 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
       const saved = localStorage.getItem('athree_sales_agents');
       if (saved) {
         try {
-          setOfficialSales(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOfficialSales(parsed);
+          }
         } catch (e) {}
       }
     };

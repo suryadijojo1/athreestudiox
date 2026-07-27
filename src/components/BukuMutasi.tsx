@@ -29,6 +29,8 @@ interface BukuMutasiProps {
   activeSession?: CashierSession | null;
   sessionsHistory?: CashierSession[];
   onUpdateSessionOpeningBalance?: (newBalance: number) => void;
+  onManualSync?: () => void;
+  isSyncing?: boolean;
 }
 
 interface BankAccount {
@@ -46,7 +48,9 @@ export default function BukuMutasi({
   userRole,
   activeSession = null,
   sessionsHistory = [],
-  onUpdateSessionOpeningBalance
+  onUpdateSessionOpeningBalance,
+  onManualSync,
+  isSyncing = false
 }: BukuMutasiProps) {
   // Load registered bank accounts
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(() => {
@@ -431,6 +435,22 @@ export default function BukuMutasi({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {onManualSync && (
+              <button
+                type="button"
+                onClick={onManualSync}
+                disabled={isSyncing}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  isSyncing 
+                    ? 'bg-emerald-100 text-emerald-800 cursor-not-allowed opacity-75'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg'
+                }`}
+              >
+                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing ? 'Menyimpan...' : 'Simpan (Sinkronisasi Data Sekarang)'}
+              </button>
+            )}
+
             <button
               onClick={() => setShowAddForm(!showAddForm)}
               className="bg-indigo-55 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"

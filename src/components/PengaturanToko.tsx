@@ -166,7 +166,10 @@ export default function PengaturanToko({
   const [salesAgents, setSalesAgents] = useState<SalesAgent[]>(() => {
     const saved = localStorage.getItem('athree_sales_agents');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
     }
     const defaults = [
       { code: 'SL-01', name: 'Dewi Lestari' },
@@ -186,7 +189,10 @@ export default function PengaturanToko({
       try {
         const saved = localStorage.getItem('athree_sales_agents');
         if (saved) {
-          setSalesAgents(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSalesAgents(parsed);
+          }
         }
       } catch (e) {
         console.error("Gagal sinkronisasi sales agents di PengaturanToko:", e);

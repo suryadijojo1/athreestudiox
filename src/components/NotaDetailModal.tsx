@@ -4,19 +4,20 @@
  */
 
 import React, { useState } from 'react';
-import { Invoice } from '../types';
-import { Printer, X, CreditCard, AlertCircle, Phone, MapPin, Eye, Settings, HelpCircle, Columns, ChevronDown, ChevronUp, Check, Shield } from 'lucide-react';
+import { Invoice, PaymentTransaction } from '../types';
+import { Printer, X, CreditCard, AlertCircle, Phone, MapPin, Eye, Settings, HelpCircle, Columns, ChevronDown, ChevronUp, Check, Shield, Calendar } from 'lucide-react';
 import LogoRenderer from './LogoRenderer';
 
 interface NotaDetailModalProps {
   invoice: Invoice | null;
   onClose: () => void;
-  onPaySettlement: (invoiceId: string, amount: number, paymentMethod?: 'CASH' | 'TRANSFER') => void;
+  onPaySettlement: (invoiceId: string, amount: number, paymentMethod?: 'CASH' | 'TRANSFER', paymentDate?: string) => void;
   onUpdateProductionStatus?: (invoiceId: string, status: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL') => void;
   isQuickPrint?: boolean;
+  paymentTransactions?: PaymentTransaction[];
 }
 
-export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onUpdateProductionStatus, isQuickPrint = false }: NotaDetailModalProps) {
+export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onUpdateProductionStatus, isQuickPrint = false, paymentTransactions = [] }: NotaDetailModalProps) {
   if (!invoice) return null;
 
   const bankAccounts = React.useMemo(() => {
@@ -99,7 +100,10 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
   const [salesAgents, setSalesAgents] = useState<{ code: string; name: string }[]>(() => {
     try {
       const saved = localStorage.getItem('athree_sales_agents');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch (e) {}
     return [
       { code: 'SL-01', name: 'Dewi Lestari' },
@@ -113,7 +117,10 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
     const handleRefreshSales = () => {
       try {
         const saved = localStorage.getItem('athree_sales_agents');
-        if (saved) setSalesAgents(JSON.parse(saved));
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) setSalesAgents(parsed);
+        }
       } catch (e) {}
     };
     window.addEventListener('athree-sales-agents-changed', handleRefreshSales);
@@ -217,12 +224,21 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
     }).format(value);
   };
 
+  const [settleDate, setSettleDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+
+  const invoicePayments = React.useMemo(() => {
+    if (!invoice) return [];
+    return (paymentTransactions || [])
+      .filter(tx => tx.invoiceId === invoice.id || (tx.invoiceNum && tx.invoiceNum.toLowerCase() === invoice.invoiceNum.toLowerCase()))
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }, [invoice, paymentTransactions]);
+
   const handlePrint = () => {
     window.print();
   };
 
   const handlePayRemaining = (method: 'CASH' | 'TRANSFER') => {
-    onPaySettlement(invoice.id, invoice.remainingDebt, method);
+    onPaySettlement(invoice.id, invoice.remainingDebt, method, settleDate);
     setShowPaySelect(false);
   };
 
@@ -332,26 +348,33 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
                     Bayar Lunas
                   </button>
                 ) : (
-                  <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 p-1 rounded-xl border border-indigo-100/50 animate-fade-in">
-                    <span className="text-[10px] text-slate-500 font-bold px-1.5">Metode:</span>
+                  <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 p-1 px-2 rounded-xl border border-indigo-100/50 animate-fade-in text-[11px]">
+                    <span className="text-[10px] text-slate-500 font-bold">Tgl:</span>
+                    <input
+                      type="date"
+                      value={settleDate}
+                      onChange={(e) => setSettleDate(e.target.value)}
+                      className="px-1.5 py-0.5 bg-white border border-indigo-100 rounded text-[11px] font-bold text-slate-700 outline-none"
+                    />
+                    <span className="text-[10px] text-slate-500 font-bold ml-0.5">Bayar:</span>
                     <button
                       type="button"
                       onClick={() => handlePayRemaining('CASH')}
-                      className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[11px] font-black hover:bg-emerald-700 cursor-pointer"
+                      className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[11px] font-black hover:bg-emerald-700 cursor-pointer border-none"
                     >
                       💵 Tunai
                     </button>
                     <button
                       type="button"
                       onClick={() => handlePayRemaining('TRANSFER')}
-                      className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[11px] font-black hover:bg-indigo-700 cursor-pointer"
+                      className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[11px] font-black hover:bg-indigo-700 cursor-pointer border-none"
                     >
                       🏦 Bank
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowPaySelect(false)}
-                      className="p-1 text-slate-400 hover:text-rose-500 rounded-lg cursor-pointer"
+                      className="p-1 text-slate-400 hover:text-rose-500 rounded-lg cursor-pointer border-none"
                       title="Batal"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -792,6 +815,86 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
                   </div>
                 </div>
 
+              </div>
+
+              {/* Rincian Riwayat Pembayaran (Dengan Tanggal) */}
+              <div className="mt-4 p-3.5 bg-indigo-50/30 rounded-2xl border border-indigo-100/70 space-y-2 text-xs font-sans print:bg-slate-50 print:border-slate-300">
+                <div className="flex justify-between items-center border-b border-indigo-100/60 pb-2 print:border-slate-300">
+                  <span className="font-black text-slate-700 uppercase tracking-tight flex items-center gap-1.5 text-xs print:text-black">
+                    <Calendar className="w-3.5 h-3.5 text-indigo-600 print:text-black" /> RINCIAN / RIWAYAT PEMBAYARAN
+                  </span>
+                  <span className="text-[10px] font-bold text-indigo-700 print:text-slate-800">
+                    {invoice.remainingDebt === 0 ? 'Lunas Penuh' : `Sisa ${formatRp(invoice.remainingDebt)}`}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {/* Uang Muka DP Row */}
+                  {invoice.downPayment > 0 && (
+                    <div className="flex items-center justify-between p-2 bg-white rounded-xl border border-indigo-50/80 text-[11px] print:border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider">
+                          DP
+                        </span>
+                        <div>
+                          <div className="font-bold text-slate-800 print:text-black">Uang Muka (DP)</div>
+                          <div className="text-[10px] text-slate-400 font-mono font-semibold print:text-slate-600">
+                            {new Date(invoice.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono font-black text-emerald-700 print:text-black">{formatRp(invoice.downPayment)}</div>
+                        <span className="text-[9.5px] font-bold text-slate-400 uppercase print:text-slate-600">{invoice.paymentMethodDP || 'CASH'}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pelunasan / Cicilan Transactions */}
+                  {invoicePayments.length > 0 ? (
+                    invoicePayments.map((tx, idx) => (
+                      <div key={tx.id || idx} className="flex items-center justify-between p-2 bg-white rounded-xl border border-indigo-50/80 text-[11px] print:border-slate-200">
+                        <div className="flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase tracking-wider">
+                            {tx.type === 'DP' ? 'DP' : `PELUNASAN #${idx + 1}`}
+                          </span>
+                          <div>
+                            <div className="font-bold text-slate-800 print:text-black">
+                              {tx.type === 'DP' ? 'Pembayaran Uang Muka' : 'Pelunasan / Cicilan'}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono font-semibold print:text-slate-600">
+                              {new Date(tx.timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono font-black text-indigo-700 print:text-black">{formatRp(tx.amount)}</div>
+                          <span className="text-[9.5px] font-bold text-slate-400 uppercase print:text-slate-600">{tx.method}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    invoice.settlement > 0 && (
+                      <div className="flex items-center justify-between p-2 bg-white rounded-xl border border-indigo-50/80 text-[11px] print:border-slate-200">
+                        <div className="flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase tracking-wider">
+                            PELUNASAN
+                          </span>
+                          <div>
+                            <div className="font-bold text-slate-800 print:text-black">Pelunasan Tagihan</div>
+                            <div className="text-[10px] text-slate-400 font-mono font-semibold print:text-slate-600">
+                              {new Date(invoice.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono font-black text-indigo-700 print:text-black">{formatRp(invoice.settlement)}</div>
+                          <span className="text-[9.5px] font-bold text-slate-400 uppercase print:text-slate-600">{invoice.paymentMethodSettlement || 'CASH'}</span>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
               </div>
 
               {/* Signatures Field (Required for physical convection receipts) */}

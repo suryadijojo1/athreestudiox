@@ -10,7 +10,7 @@ import { Search, Eye, CircleDollarSign, Calendar, ChevronRight, Filter, Receipt,
 interface NotaListProps {
   invoices: Invoice[];
   onSelectInvoice: (invoice: Invoice) => void;
-  onPaySettlement: (invoiceId: string, amount: number, paymentMethod?: 'CASH' | 'TRANSFER') => void;
+  onPaySettlement: (invoiceId: string, amount: number, paymentMethod?: 'CASH' | 'TRANSFER', paymentDate?: string) => void;
   onUpdateProductionStatus: (invoiceId: string, status: 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL') => void;
   onEditInvoice?: (invoice: Invoice) => void;
   onQuickPrint?: (invoice: Invoice) => void;
@@ -31,6 +31,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
   const [deleteInvoiceId, setDeleteInvoiceId] = useState<string | null>(null);
   const [settleAmount, setSettleAmount] = useState<number>(0);
   const [settleMethod, setSettleMethod] = useState<'CASH' | 'TRANSFER'>('CASH');
+  const [settleDate, setSettleDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
   // Loaded bank accounts for settlement payment display
   const [bankAccounts, setBankAccounts] = useState<{ id: string; bankName: string; accountNumber: string; accountOwner: string }[]>(() => {
@@ -65,7 +66,10 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
   const [salesAgents, setSalesAgents] = useState<{ code: string; name: string }[]>(() => {
     try {
       const saved = localStorage.getItem('athree_sales_agents');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch (e) {}
     return [
       { code: 'SL-01', name: 'Dewi Lestari' },
@@ -79,7 +83,10 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     const handleRefreshSales = () => {
       try {
         const saved = localStorage.getItem('athree_sales_agents');
-        if (saved) setSalesAgents(JSON.parse(saved));
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) setSalesAgents(parsed);
+        }
       } catch (e) {}
     };
     window.addEventListener('athree-sales-agents-changed', handleRefreshSales);
@@ -172,6 +179,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     e.stopPropagation();
     setSettleInvoiceId(invoice.id);
     setSettleAmount(invoice.remainingDebt);
+    setSettleDate(invoice.date ? invoice.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
   };
 
   const getDeadlineStatus = (deadlineDateStr: string | undefined, productionStatus: string | undefined) => {
@@ -217,7 +225,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
   const handleSaveSettle = (e: React.FormEvent, invoiceId: string) => {
     e.preventDefault();
     if (settleAmount <= 0) return;
-    onPaySettlement(invoiceId, settleAmount, settleMethod);
+    onPaySettlement(invoiceId, settleAmount, settleMethod, settleDate);
     setSettleInvoiceId(null);
   };
 
@@ -708,6 +716,20 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                       <span className="text-indigo-500 font-bold">Tunggakan Sisa Piutang:</span>
                       <strong className="text-amber-600 font-mono font-black">{formatRp(currentInvoice.remainingDebt)}</strong>
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1" htmlFor="settle-date-input">
+                      Tanggal Pembayaran / Pelunasan
+                    </label>
+                    <input
+                      type="date"
+                      id="settle-date-input"
+                      required
+                      value={settleDate}
+                      onChange={(e) => setSettleDate(e.target.value)}
+                      className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 border-2 border-indigo-50 rounded-2xl text-slate-800 outline-none focus:border-indigo-500 font-bold transition"
+                    />
                   </div>
 
                   <div>

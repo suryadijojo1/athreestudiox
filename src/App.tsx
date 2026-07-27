@@ -428,7 +428,10 @@ export default function App() {
         setFirebaseStatus('CONNECTED');
       } catch (e: any) {
         console.warn("Firebase offline or error validating connection:", e);
-        if (e?.message?.includes('client is offline')) {
+        if (checkQuotaError(e)) {
+          setQuotaExceeded(true);
+          setFirebaseStatus('OFFLINE');
+        } else if (e?.message?.includes('client is offline')) {
           setFirebaseStatus('OFFLINE');
         } else {
           setFirebaseStatus('ERROR');
@@ -492,8 +495,28 @@ export default function App() {
             localStorage.removeItem('nota_stok_active_session');
           }
 
-          if (dbSalesAgents) {
+          if (dbSalesAgents && Array.isArray(dbSalesAgents) && dbSalesAgents.length > 0) {
             localStorage.setItem('athree_sales_agents', JSON.stringify(dbSalesAgents));
+            window.dispatchEvent(new Event('athree-sales-agents-changed'));
+          } else {
+            // Cloud HAS products/invoices, but DOES NOT have sales agents yet (or has empty agents)
+            const storedSalesStr = localStorage.getItem('athree_sales_agents');
+            let initialSales = [
+              { code: 'SL-01', name: 'Dewi Lestari' },
+              { code: 'SL-02', name: 'Budi Hermawan' },
+              { code: 'SL-03', name: 'Stephanus' },
+              { code: 'SL-04', name: 'Martha Papua' }
+            ];
+            if (storedSalesStr) {
+              try {
+                const parsed = JSON.parse(storedSalesStr);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  initialSales = parsed;
+                }
+              } catch (e) {}
+            }
+            localStorage.setItem('athree_sales_agents', JSON.stringify(initialSales));
+            await saveSalesAgentsToFirestore(initialSales);
             window.dispatchEvent(new Event('athree-sales-agents-changed'));
           }
 
@@ -664,6 +687,10 @@ export default function App() {
         setIsDatabaseLoaded(true);
       } catch (err) {
         console.error("Gagal sinkronisasi data awal dengan Firebase Firestore:", err);
+        if (checkQuotaError(err)) {
+          setQuotaExceeded(true);
+          setFirebaseStatus('OFFLINE');
+        }
         const storedProducts = localStorage.getItem('nota_stok_products');
         const storedInvoices = localStorage.getItem('nota_stok_invoices');
         const storedMovements = localStorage.getItem('nota_stok_movements');
@@ -729,6 +756,7 @@ export default function App() {
       });
     }, (error) => {
       console.error("Gagal listen products:", error);
+      checkQuotaError(error);
     });
 
     // Listen to 'invoices' collection
@@ -747,6 +775,7 @@ export default function App() {
       });
     }, (error) => {
       console.error("Gagal listen invoices:", error);
+      checkQuotaError(error);
     });
 
     // Listen to 'movements' collection
@@ -765,6 +794,7 @@ export default function App() {
       });
     }, (error) => {
       console.error("Gagal listen movements:", error);
+      checkQuotaError(error);
     });
 
     // Listen to 'payment_transactions' collection
@@ -783,6 +813,7 @@ export default function App() {
       });
     }, (error) => {
       console.error("Gagal listen payment_transactions:", error);
+      checkQuotaError(error);
     });
 
     // Listen to 'sessions_history' collection
@@ -801,6 +832,7 @@ export default function App() {
       });
     }, (error) => {
       console.error("Gagal listen sessions_history:", error);
+      checkQuotaError(error);
     });
 
     // Listen to 'metadata' collection for active_session, credentials, sales_agents, shop_settings
@@ -850,11 +882,13 @@ export default function App() {
             });
           }
         } else if (ds.id === 'sales_agents') {
-          const agents = data.agents || [];
-          const storedSalesStr = localStorage.getItem('athree_sales_agents');
-          if (JSON.stringify(agents) !== storedSalesStr) {
-            localStorage.setItem('athree_sales_agents', JSON.stringify(agents));
-            window.dispatchEvent(new Event('athree-sales-agents-changed'));
+          const agents = data.agents;
+          if (Array.isArray(agents) && agents.length > 0) {
+            const storedSalesStr = localStorage.getItem('athree_sales_agents');
+            if (JSON.stringify(agents) !== storedSalesStr) {
+              localStorage.setItem('athree_sales_agents', JSON.stringify(agents));
+              window.dispatchEvent(new Event('athree-sales-agents-changed'));
+            }
           }
         } else if (ds.id === 'shop_settings') {
           const storedLogoType = localStorage.getItem('athree-shop-logo-type');
@@ -886,6 +920,7 @@ export default function App() {
       });
     }, (error) => {
       console.error("Gagal listen metadata:", error);
+      checkQuotaError(error);
     });
 
     return () => {
@@ -1066,6 +1101,10 @@ export default function App() {
       })
       .catch((err) => {
         console.error("Gagal melakukan background sync ke Firestore:", err);
+        if (checkQuotaError(err)) {
+          setQuotaExceeded(true);
+          setFirebaseStatus('OFFLINE');
+        }
       })
       .finally(() => {
         setIsFirebaseSyncing(false);
@@ -1261,7 +1300,7 @@ export default function App() {
   };
 
   // Record intermediate Down Payments / Partial settlement payments
-  const handlePaySettlement = (invoiceId: string, amountPaid: number, paymentMethod: 'CASH' | 'TRANSFER' = 'CASH') => {
+  const handlePaySettlement = (invoiceId: string, amountPaid: number, paymentMethod: 'CASH' | 'TRANSFER' = 'CASH', paymentDate?: string) => {
     let invoiceNum = '';
     let customerName = '';
     const nextInvoices = invoices.map(inv => {
@@ -1296,6 +1335,16 @@ export default function App() {
       return inv;
     });
 
+    // Determine timestamp from paymentDate if provided
+    let txTimestamp = new Date().toISOString();
+    if (paymentDate) {
+      const formattedDateStr = paymentDate.includes('T') ? paymentDate : `${paymentDate}T12:00:00`;
+      const parsedDate = new Date(formattedDateStr);
+      if (!isNaN(parsedDate.getTime())) {
+        txTimestamp = parsedDate.toISOString();
+      }
+    }
+
     // Create payment transactions record
     const newTx: PaymentTransaction = {
       id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1305,7 +1354,7 @@ export default function App() {
       amount: amountPaid,
       method: paymentMethod,
       type: 'PELUNASAN',
-      timestamp: new Date().toISOString(),
+      timestamp: txTimestamp,
       cashier: userRole
     };
     const updatedTxs = [newTx, ...paymentTransactions];
@@ -1313,10 +1362,11 @@ export default function App() {
     localStorage.setItem('nota_stok_payment_transactions', JSON.stringify(updatedTxs));
 
     // Add audit log
-    const logMsg = `Menerima cicilan/pelunasan sebesar Rp ${amountPaid.toLocaleString('id-ID')} (${paymentMethod}) untuk Nota ${invoiceNum} (${customerName}).`;
+    const dateLabel = paymentDate ? ` (tgl ${paymentDate})` : '';
+    const logMsg = `Menerima cicilan/pelunasan sebesar Rp ${amountPaid.toLocaleString('id-ID')} (${paymentMethod}${dateLabel}) untuk Nota ${invoiceNum} (${customerName}).`;
     const settlementLog: AuditLog = {
       id: `log-${Date.now()}`,
-      timestamp: new Date().toISOString(),
+      timestamp: txTimestamp,
       user: userRole,
       actionType: 'PAYMENT_SETTLEMENT',
       module: 'NOTA',
@@ -1527,6 +1577,41 @@ export default function App() {
       setFirebaseStatus('CONNECTED');
     } catch (e) {
       console.error("Gagal sinkronisasi update riwayat sesi ke Firestore:", e);
+    } finally {
+      setIsFirebaseSyncing(false);
+    }
+  };
+
+  const handleManualSync = async () => {
+    if (quotaExceeded) {
+      alert("Gagal melakukan sinkronisasi: Batas kuota cloud harian terlampaui.");
+      return;
+    }
+    
+    setIsFirebaseSyncing(true);
+    try {
+      const syncPromises = [
+        syncIncrementalToFirestore('products', products, lastSyncedProductsRef),
+        syncIncrementalToFirestore('invoices', invoices, lastSyncedInvoicesRef),
+        syncIncrementalToFirestore('movements', movements, lastSyncedMovementsRef),
+        syncIncrementalToFirestore('audit_logs', auditLogs, lastSyncedAuditLogsRef),
+        syncIncrementalToFirestore('payment_transactions', paymentTransactions, lastSyncedPaymentsRef),
+        syncIncrementalToFirestore('sessions_history', sessionsHistory, lastSyncedHistoryRef)
+      ];
+      if (activeSession) {
+        syncPromises.push(saveActiveSessionToFirestore(activeSession));
+      }
+      
+      await Promise.all(syncPromises);
+      
+      const nowStr = new Date().toISOString();
+      setLastSyncTime(nowStr);
+      localStorage.setItem('nota_stok_last_sync_time', nowStr);
+      setFirebaseStatus('CONNECTED');
+      alert("Sinkronisasi Sukses! Semua data mutasi, nota, stok, dan sesi kasir telah berhasil dicadangkan ke Cloud Firestore.");
+    } catch (err: any) {
+      console.error("Gagal melakukan sinkronisasi manual:", err);
+      alert(`Gagal sinkronisasi data: ${err.message || err}`);
     } finally {
       setIsFirebaseSyncing(false);
     }
@@ -2580,6 +2665,8 @@ export default function App() {
               activeSession={activeSession}
               sessionsHistory={sessionsHistory}
               onUpdateSessionOpeningBalance={handleUpdateSessionOpeningBalance}
+              onManualSync={handleManualSync}
+              isSyncing={isFirebaseSyncing}
             />
           )}
 
@@ -2609,6 +2696,7 @@ export default function App() {
           onClose={() => setSelectedInvoice(null)}
           onPaySettlement={handlePaySettlement}
           onUpdateProductionStatus={handleUpdateProductionStatus}
+          paymentTransactions={paymentTransactions}
         />
       )}
 
@@ -2620,6 +2708,7 @@ export default function App() {
           onPaySettlement={handlePaySettlement}
           onUpdateProductionStatus={handleUpdateProductionStatus}
           isQuickPrint={true}
+          paymentTransactions={paymentTransactions}
         />
       )}
 

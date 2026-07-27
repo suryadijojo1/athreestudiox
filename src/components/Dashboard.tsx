@@ -203,7 +203,10 @@ export default function Dashboard({
   const [officialSalesList, setOfficialSalesList] = React.useState<{ code: string; name: string }[]>(() => {
     try {
       const saved = localStorage.getItem('athree_sales_agents');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch (e) {}
     return [
       { code: 'SL-01', name: 'Dewi Lestari' },
@@ -218,7 +221,10 @@ export default function Dashboard({
       try {
         const saved = localStorage.getItem('athree_sales_agents');
         if (saved) {
-          setOfficialSalesList(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOfficialSalesList(parsed);
+          }
         }
       } catch (e) {}
     };
