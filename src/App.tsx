@@ -67,7 +67,10 @@ import {
   Wrench,
   Mail,
   Key,
-  AlertTriangle
+  AlertTriangle,
+  Trash2,
+  RefreshCw,
+  X
 } from 'lucide-react';
 
 export default function App() {
@@ -223,6 +226,41 @@ export default function App() {
 
   // --- OTP STATE MANAGERS & BACKEND HANDLERS ---
   const [isResetOtpModalOpen, setIsResetOtpModalOpen] = useState(false);
+  const [isClearCacheModalOpen, setIsClearCacheModalOpen] = useState(false);
+  const [cacheToastMsg, setCacheToastMsg] = useState<string | null>(null);
+
+  const handleClearCache = async (mode: 'LIGHT' | 'RESYNC' | 'HARD') => {
+    if (mode === 'LIGHT') {
+      localStorage.removeItem('athree_firestore_quota_exceeded');
+      setQuotaExceeded(false);
+      sessionStorage.clear();
+      if ('caches' in window) {
+        try {
+          const names = await caches.keys();
+          await Promise.all(names.map(name => caches.delete(name)));
+        } catch (e) {
+          console.warn('Caches delete error:', e);
+        }
+      }
+      setCacheToastMsg('✨ Cache ringan & file temporary berhasil dibersihkan!');
+      setTimeout(() => setCacheToastMsg(null), 4000);
+    } else if (mode === 'RESYNC') {
+      localStorage.removeItem('athree_firestore_quota_exceeded');
+      setQuotaExceeded(false);
+      setCacheToastMsg('⌛ Syncing ulang data dari Cloud Firestore...');
+      try {
+        await handleManualSync();
+        setCacheToastMsg('✅ Data paling update berhasil di-download ulang dari Cloud Firebase!');
+      } catch (err) {
+        setCacheToastMsg('⚠️ Gagal terhubung ke Cloud. Data lokal tetap dipertahankan.');
+      }
+      setTimeout(() => setCacheToastMsg(null), 4000);
+    } else if (mode === 'HARD') {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.reload();
+    }
+  };
   const [otpCode, setOtpCode] = useState('');
   const [otpSendingStatus, setOtpSendingStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [otpVerificationStatus, setOtpVerificationStatus] = useState<'idle' | 'verifying' | 'verified' | 'error'>('idle');
@@ -1427,6 +1465,8 @@ export default function App() {
     };
     setActiveSession(newSession);
     localStorage.setItem('nota_stok_active_session', JSON.stringify(newSession));
+    localStorage.setItem('athree_mutasi_starting_balance', openingBalance.toString());
+    window.dispatchEvent(new Event('athree-starting-balance-changed'));
 
     // Audit Log for opening kasir
     const openLog: AuditLog = {
@@ -1509,43 +1549,46 @@ export default function App() {
   };
 
   const handleUpdateSessionOpeningBalance = async (newOpeningBalance: number) => {
-    if (!activeSession) return;
-    
-    const updatedSession: CashierSession = {
-      ...activeSession,
-      openingBalance: newOpeningBalance,
-      expectedCash: newOpeningBalance + (activeSession.expectedCash - activeSession.openingBalance)
-    };
-    
-    setActiveSession(updatedSession);
-    localStorage.setItem('nota_stok_active_session', JSON.stringify(updatedSession));
-    
-    // Audit Log for revised opening balance
-    const revLog: AuditLog = {
-      id: `log-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      user: 'OWNER',
-      actionType: 'RESET_SYSTEM',
-      module: 'SISTEM',
-      description: `Owner merevisi modal awal sesi kasir aktif menjadi Rp ${newOpeningBalance.toLocaleString('id-ID')}.`,
-      referenceNum: 'SESSION'
-    };
-    
-    const nextLogs = [revLog, ...auditLogs];
-    setAuditLogs(nextLogs);
-    localStorage.setItem('nota_stok_audit_logs', JSON.stringify(nextLogs));
-    
-    try {
-      setIsFirebaseSyncing(true);
-      await Promise.all([
-        saveActiveSessionToFirestore(updatedSession),
-        syncIncrementalToFirestore('audit_logs', nextLogs, lastSyncedAuditLogsRef)
-      ]);
-      setFirebaseStatus('CONNECTED');
-    } catch (e) {
-      console.error("Gagal sinkronisasi update modal awal ke Firestore:", e);
-    } finally {
-      setIsFirebaseSyncing(false);
+    localStorage.setItem('athree_mutasi_starting_balance', newOpeningBalance.toString());
+    window.dispatchEvent(new Event('athree-starting-balance-changed'));
+
+    if (activeSession) {
+      const updatedSession: CashierSession = {
+        ...activeSession,
+        openingBalance: newOpeningBalance,
+        expectedCash: newOpeningBalance + (activeSession.expectedCash - activeSession.openingBalance)
+      };
+      
+      setActiveSession(updatedSession);
+      localStorage.setItem('nota_stok_active_session', JSON.stringify(updatedSession));
+      
+      // Audit Log for revised opening balance
+      const revLog: AuditLog = {
+        id: `log-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        user: 'OWNER',
+        actionType: 'RESET_SYSTEM',
+        module: 'SISTEM',
+        description: `Owner merevisi modal awal sesi kasir aktif menjadi Rp ${newOpeningBalance.toLocaleString('id-ID')}.`,
+        referenceNum: 'SESSION'
+      };
+      
+      const nextLogs = [revLog, ...auditLogs];
+      setAuditLogs(nextLogs);
+      localStorage.setItem('nota_stok_audit_logs', JSON.stringify(nextLogs));
+      
+      try {
+        setIsFirebaseSyncing(true);
+        await Promise.all([
+          saveActiveSessionToFirestore(updatedSession),
+          syncIncrementalToFirestore('audit_logs', nextLogs, lastSyncedAuditLogsRef)
+        ]);
+        setFirebaseStatus('CONNECTED');
+      } catch (e) {
+        console.error("Gagal sinkronisasi update modal awal ke Firestore:", e);
+      } finally {
+        setIsFirebaseSyncing(false);
+      }
     }
   };
 
@@ -2279,6 +2322,17 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Clear Cache Button */}
+              <button
+                type="button"
+                id="btn-header-clear-cache"
+                onClick={() => setIsClearCacheModalOpen(true)}
+                className="p-2 rounded-xl bg-white hover:bg-amber-50 border border-slate-250/90 text-slate-600 hover:text-amber-600 transition duration-150 cursor-pointer shadow-3xs flex items-center justify-center dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:text-amber-400"
+                title="Menu Hapus Cache & Performa Browser"
+              >
+                <Trash2 className="w-4 h-4 shrink-0 text-amber-500" />
+              </button>
+
               {/* Theme Toggle (Light / Dark Modo) */}
               <button
                 type="button"
@@ -2493,6 +2547,15 @@ export default function App() {
           {/* Quick Settings Action: Reset database & Playground controls */}
           <div className="p-4 border-t border-indigo-100 space-y-2 bg-indigo-50/10">
             <button
+              id="sidebar-btn-clear-cache"
+              onClick={() => setIsClearCacheModalOpen(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-amber-700 rounded-xl text-xs font-bold transition duration-155 cursor-pointer shadow-3xs"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-amber-500" />
+              Menu Hapus Cache
+            </button>
+
+            <button
               id="sidebar-btn-seed-simulation"
               onClick={userRole === 'OWNER' ? handleResetToPresets : undefined}
               disabled={userRole !== 'OWNER'}
@@ -2654,6 +2717,7 @@ export default function App() {
               onUpdatePasswords={handleUpdatePasswords}
               onResetStokBarang={handleResetStokBarang}
               onResetDaftarNota={handleResetDaftarNota}
+              onClearCache={handleClearCache}
             />
           )}
 
@@ -2751,6 +2815,136 @@ export default function App() {
             <div className="py-2.5 px-4 bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100/50 dark:border-indigo-900/30 rounded-2xl flex items-center justify-center gap-3 text-xs font-black text-indigo-700 dark:text-indigo-400">
               <span className="w-2 h-2 bg-indigo-600 dark:bg-indigo-400 rounded-full animate-ping" />
               <span>SINKRONISASI FIRESTORE LOGOUT</span>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* CLEAR CACHE OVERLAY MODAL */}
+      {isClearCacheModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-all duration-300">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-amber-100 dark:border-slate-800 space-y-5 text-left relative"
+          >
+            <button
+              type="button"
+              onClick={() => setIsClearCacheModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 p-2 rounded-full transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">🧹 Menu Hapus Cache & Pemeliharaan</h3>
+                <p className="text-xs text-slate-400 font-medium">Bersihkan memori lokal, hapus file temp, atau sync ulang dari cloud.</p>
+              </div>
+            </div>
+
+            {cacheToastMsg && (
+              <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-extrabold rounded-2xl flex items-center gap-2 animate-bounce">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                <span>{cacheToastMsg}</span>
+              </div>
+            )}
+
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl space-y-2 text-xs border border-slate-100 dark:border-slate-700">
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-semibold">Koneksi Database Cloud:</span>
+                <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 uppercase">{firebaseStatus}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-semibold">Batas Kuota Firestore:</span>
+                <span className={`font-mono font-bold ${quotaExceeded ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {quotaExceeded ? 'Terlampaui (Mode LocalStorage)' : 'Normal'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              {/* Button 1: Cache Ringan */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleClearCache('LIGHT');
+                }}
+                className="w-full p-3.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 border border-amber-200 dark:border-amber-800/50 rounded-2xl text-left transition cursor-pointer flex items-center justify-between group"
+              >
+                <div>
+                  <div className="text-xs font-black text-amber-900 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    1. Bersihkan Cache Ringan & Temp
+                  </div>
+                  <p className="text-[10.5px] text-amber-800/80 dark:text-amber-400/80 font-medium mt-0.5">
+                    Hapus session sementara, error kuota, & filter. Data produk & nota TETAP AMAN.
+                  </p>
+                </div>
+                <span className="px-3 py-1 bg-amber-500 text-white font-extrabold text-[10px] rounded-xl group-hover:scale-105 transition">
+                  Jalankan
+                </span>
+              </button>
+
+              {/* Button 2: Re-Sync Cloud */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleClearCache('RESYNC');
+                }}
+                className="w-full p-3.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/50 rounded-2xl text-left transition cursor-pointer flex items-center justify-between group"
+              >
+                <div>
+                  <div className="text-xs font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-indigo-500" />
+                    2. Re-Sync Data dari Cloud Server
+                  </div>
+                  <p className="text-[10.5px] text-indigo-800/80 dark:text-indigo-400/80 font-medium mt-0.5">
+                    Mereset cache lokal & mengunduh ulang seluruh data terbaru dari Firebase Firestore.
+                  </p>
+                </div>
+                <span className="px-3 py-1 bg-indigo-600 text-white font-extrabold text-[10px] rounded-xl group-hover:scale-105 transition">
+                  Re-Sync
+                </span>
+              </button>
+
+              {/* Button 3: Total Hard Clear */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('Apakah Anda yakin ingin MENGHAPUS SELURUH CACHE LOCALSTORAGE & memuat ulang aplikasi?')) {
+                    handleClearCache('HARD');
+                  }
+                }}
+                className="w-full p-3.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-left transition cursor-pointer flex items-center justify-between group"
+              >
+                <div>
+                  <div className="text-xs font-black text-rose-900 dark:text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                    3. Hapus Seluruh Memory & Reload
+                  </div>
+                  <p className="text-[10.5px] text-rose-800/80 dark:text-rose-400/80 font-medium mt-0.5">
+                    Hapus seluruh LocalStorage browser dan memuat ulang halaman secara total.
+                  </p>
+                </div>
+                <span className="px-3 py-1 bg-rose-600 text-white font-extrabold text-[10px] rounded-xl group-hover:scale-105 transition">
+                  Hard Clear
+                </span>
+              </button>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsClearCacheModalOpen(false)}
+                className="px-5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-extrabold rounded-xl transition cursor-pointer"
+              >
+                Tutup
+              </button>
             </div>
           </motion.div>
         </div>

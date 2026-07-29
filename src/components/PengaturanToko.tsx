@@ -49,6 +49,7 @@ interface PengaturanTokoProps {
   onUpdatePasswords?: (newKasirPass: string, newOwnerPass: string, newProduksiPass: string) => Promise<void>;
   onResetStokBarang?: (mode: 'EMPTY' | 'PRESET') => void;
   onResetDaftarNota?: (mode: 'EMPTY' | 'PRESET') => void;
+  onClearCache?: (mode: 'LIGHT' | 'RESYNC' | 'HARD') => void;
 }
 
 export default function PengaturanToko({ 
@@ -61,7 +62,8 @@ export default function PengaturanToko({
   produksiPassword = 'admin',
   onUpdatePasswords,
   onResetStokBarang,
-  onResetDaftarNota
+  onResetDaftarNota,
+  onClearCache
 }: PengaturanTokoProps) {
   // Password panel states
   const [newKasirPassword, setNewKasirPassword] = useState(kasirPassword);
@@ -71,6 +73,35 @@ export default function PengaturanToko({
   const [passSuccessMsg, setPassSuccessMsg] = useState('');
 
   // Keep passwords in sync if loaded asynchronously from parent
+  // Calculate local storage cache metrics
+  const [cacheMetrics, setCacheMetrics] = useState<{ totalBytes: number; kbSize: string; itemCount: number }>({
+    totalBytes: 0,
+    kbSize: '0',
+    itemCount: 0
+  });
+
+  const refreshCacheMetrics = () => {
+    let totalBytes = 0;
+    let itemCount = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        const val = localStorage.getItem(key) || '';
+        totalBytes += key.length + val.length;
+        itemCount++;
+      }
+    }
+    setCacheMetrics({
+      totalBytes,
+      kbSize: (totalBytes / 1024).toFixed(1),
+      itemCount
+    });
+  };
+
+  useEffect(() => {
+    refreshCacheMetrics();
+  }, []);
+
   useEffect(() => {
     setNewKasirPassword(kasirPassword);
   }, [kasirPassword]);
@@ -1375,6 +1406,124 @@ export default function PengaturanToko({
                   </button>
                 </form>
               )}
+            </div>
+
+            {/* CARD: HAPUS CACHE & PEMELIHARAAN MEMORI BROWSER */}
+            <div className="bg-white dark:bg-slate-900 border border-amber-100 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-6 bg-amber-500 rounded-full" />
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-1.5 uppercase">
+                      <Trash2 className="w-4 h-4 text-amber-500" />
+                      Menu Hapus Cache & Performa Browser
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                      Bersihkan memori lokal, hapus file temporary, atau paksa re-sync data dari Cloud Firebase
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 px-3 py-1.5 rounded-2xl text-right">
+                  <div className="text-[9px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">Penggunaan Memori</div>
+                  <div className="text-xs font-mono font-black text-amber-900 dark:text-amber-200">
+                    {cacheMetrics.kbSize} KB <span className="text-[9px] font-bold text-amber-700/70">({cacheMetrics.itemCount} item)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                {/* Opsi 1: Cache Ringan */}
+                <div className="border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-4 rounded-2xl flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-extrabold text-xs mb-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      1. Cache Ringan & Temp
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
+                      Menghapus session sementara, pemicu kuota, & filter temporary. Data nota & produk TETAP AMAN.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onClearCache) {
+                        onClearCache('LIGHT');
+                      } else {
+                        localStorage.removeItem('athree_firestore_quota_exceeded');
+                        sessionStorage.clear();
+                        if ('caches' in window) {
+                          caches.keys().then(names => {
+                            names.forEach(name => caches.delete(name));
+                          });
+                        }
+                        alert('Cache ringan berhasil dibersihkan!');
+                      }
+                      refreshCacheMetrics();
+                    }}
+                    className="w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 font-black text-[10.5px] uppercase tracking-wider rounded-xl cursor-pointer border border-amber-200/80 transition text-center shadow-2xs"
+                  >
+                    Bersihkan Cache Ringan
+                  </button>
+                </div>
+
+                {/* Opsi 2: Re-Sync Cloud */}
+                <div className="border border-indigo-100 dark:border-slate-800 bg-indigo-50/30 dark:bg-indigo-950/20 p-4 rounded-2xl flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-indigo-900 dark:text-indigo-300 font-extrabold text-xs mb-1">
+                      <Database className="w-3.5 h-3.5 text-indigo-500" />
+                      2. Re-Sync Cloud Firestore
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
+                      Menghapus cache lokal dan secara otomatis mengunduh ulang data paling update dari Firebase Server.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onClearCache) {
+                        onClearCache('RESYNC');
+                      } else {
+                        alert('Memulai re-sync data dari cloud...');
+                      }
+                      refreshCacheMetrics();
+                    }}
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10.5px] uppercase tracking-wider rounded-xl cursor-pointer shadow-xs transition text-center"
+                  >
+                    Reset & Re-Sync Cloud
+                  </button>
+                </div>
+
+                {/* Opsi 3: Hard Clear */}
+                <div className="border border-rose-100 dark:border-slate-800 bg-rose-50/30 dark:bg-rose-950/20 p-4 rounded-2xl flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-rose-900 dark:text-rose-300 font-extrabold text-xs mb-1">
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                      3. Bersihkan Total & Reload
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
+                      Menghapus seluruh memori LocalStorage browser dan memuat ulang aplikasi secara penuh.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm('Apakah Anda yakin ingin MENGHAPUS SELURUH CACHE LOCALSTORAGE & memuat ulang halaman?')) {
+                        if (onClearCache) {
+                          onClearCache('HARD');
+                        } else {
+                          localStorage.clear();
+                          sessionStorage.clear();
+                          window.location.reload();
+                        }
+                      }
+                    }}
+                    className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black text-[10.5px] uppercase tracking-wider rounded-xl cursor-pointer border border-rose-200 transition text-center"
+                  >
+                    Hapus Seluruh Cache
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* CARD: RESET DATA PILIHAN */}

@@ -200,6 +200,13 @@ export default function Dashboard({
   const [salesDateFilter, setSalesDateFilter] = React.useState<'ALL' | 'MONTH' | 'WEEK'>('ALL');
   const [selectedSalesCode, setSelectedSalesCode] = React.useState<string | null>(null);
 
+  // Primary Metrics Period Filter States (Perbulan / ALL / YEAR / CUSTOM)
+  const [dashboardPeriod, setDashboardPeriod] = React.useState<'MONTH' | 'ALL' | 'YEAR' | 'CUSTOM'>('MONTH');
+  const [selectedMonthYear, setSelectedMonthYear] = React.useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+
   const [officialSalesList, setOfficialSalesList] = React.useState<{ code: string; name: string }[]>(() => {
     try {
       const saved = localStorage.getItem('athree_sales_agents');
@@ -460,8 +467,8 @@ export default function Dashboard({
 
   const modalAwal = React.useMemo(() => {
     const todayStrValue = new Date().toISOString().split('T')[0];
-    if (selectedMutationDate === todayStrValue) {
-      return activeSession ? activeSession.openingBalance : 0;
+    if (selectedMutationDate === todayStrValue && activeSession) {
+      return activeSession.openingBalance;
     }
     const matchedSession = sessions.find(s => {
       try {
@@ -474,7 +481,8 @@ export default function Dashboard({
     if (matchedSession) {
       return matchedSession.openingBalance;
     }
-    return 0; // fallback default
+    const savedMutasiBal = localStorage.getItem('athree_mutasi_starting_balance');
+    return savedMutasiBal ? parseFloat(savedMutasiBal) : 500000;
   }, [selectedMutationDate, activeSession, sessions]);
 
   const todayInflow = React.useMemo(() => {
@@ -491,12 +499,8 @@ export default function Dashboard({
 
   const todayNetFlow = todayInflow - todayOutflow;
   const saldoHariIni = React.useMemo(() => {
-    const todayStrValue = new Date().toISOString().split('T')[0];
-    if (selectedMutationDate === todayStrValue) {
-      return activeSession ? (modalAwal + todayInflow - todayOutflow) : 0;
-    }
     return modalAwal + todayInflow - todayOutflow;
-  }, [selectedMutationDate, activeSession, modalAwal, todayInflow, todayOutflow]);
+  }, [modalAwal, todayInflow, todayOutflow]);
 
   // Real-time Cash Flows from active session
   const currentSessionPayments = activeSession
@@ -523,10 +527,121 @@ export default function Dashboard({
     ? activeSession.openingBalance + sessionCashIn - sessionCashOut
     : 0;
 
-  const totalRevenue = invoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
-  const totalCashReceived = invoices.reduce((acc, inv) => acc + inv.downPayment + inv.settlement, 0);
-  const totalReceivables = invoices.reduce((acc, inv) => acc + inv.remainingDebt, 0);
-  const totalSoldQty = invoices.reduce((acc, inv) => acc + inv.totalQty, 0);
+  // Filtered Invoices for Primary Dashboard Metrics (Perbulan / ALL / YEAR / CUSTOM)
+  const filteredDashboardInvoices = React.useMemo(() => {
+    if (dashboardPeriod === 'ALL') return invoices;
+
+    const now = new Date();
+    let targetYear = now.getFullYear();
+    let targetMonth = now.getMonth();
+
+    if (dashboardPeriod === 'CUSTOM' && selectedMonthYear) {
+      const parts = selectedMonthYear.split('-');
+      if (parts.length === 2) {
+        targetYear = parseInt(parts[0], 10);
+        targetMonth = parseInt(parts[1], 10) - 1;
+      }
+    }
+
+    return invoices.filter(inv => {
+      if (!inv.date) return false;
+      const invDate = new Date(inv.date);
+      if (isNaN(invDate.getTime())) return false;
+
+      if (dashboardPeriod === 'MONTH' || dashboardPeriod === 'CUSTOM') {
+        return invDate.getFullYear() === targetYear && invDate.getMonth() === targetMonth;
+      } else if (dashboardPeriod === 'YEAR') {
+        return invDate.getFullYear() === targetYear;
+      }
+      return true;
+    });
+  }, [invoices, dashboardPeriod, selectedMonthYear]);
+
+  const totalRevenue = filteredDashboardInvoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
+  const totalCashReceived = filteredDashboardInvoices.reduce((acc, inv) => acc + inv.downPayment + inv.settlement, 0);
+  const totalReceivables = filteredDashboardInvoices.reduce((acc, inv) => acc + inv.remainingDebt, 0);
+  const totalSoldQty = filteredDashboardInvoices.reduce((acc, inv) => acc + inv.totalQty, 0);
+
+  // Full Monthly Financial Breakdown list (accumulated by Year-Month)
+  const allMonthlySummaries = React.useMemo(() => {
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    const map: { [key: string]: { monthKey: string; label: string; year: number; month: number; omset: number; kasMasuk: number; piutang: number; count: number; qty: number } } = {};
+
+    invoices.forEach(inv => {
+      if (!inv.date) return;
+      const d = new Date(inv.date);
+      if (isNaN(d.getTime())) return;
+
+      const y = d.getFullYear();
+      const m = d.getMonth();
+      const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+
+      if (!map[monthKey]) {
+        map[monthKey] = {
+          monthKey,
+          label: `${monthNames[m]} ${y}`,
+          year: y,
+          month: m,
+          omset: 0,
+          kasMasuk: 0,
+          piutang: 0,
+          count: 0,
+          qty: 0
+        };
+      }
+
+      map[monthKey].omset += inv.totalAmount;
+      map[monthKey].kasMasuk += (inv.downPayment + inv.settlement);
+      map[monthKey].piutang += inv.remainingDebt;
+      map[monthKey].count += 1;
+      map[monthKey].qty += inv.totalQty;
+    });
+
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    if (!map[currentKey]) {
+      map[currentKey] = {
+        monthKey: currentKey,
+        label: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
+        year: now.getFullYear(),
+        month: now.getMonth(),
+        omset: 0,
+        kasMasuk: 0,
+        piutang: 0,
+        count: 0,
+        qty: 0
+      };
+    }
+
+    return Object.values(map).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  }, [invoices]);
+
+  const getPeriodLabel = () => {
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    if (dashboardPeriod === 'MONTH') {
+      const now = new Date();
+      return `Bulan Ini (${monthNames[now.getMonth()]} ${now.getFullYear()})`;
+    }
+    if (dashboardPeriod === 'CUSTOM') {
+      const parts = selectedMonthYear.split('-');
+      if (parts.length === 2) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        return `Bulan ${monthNames[m]} ${y}`;
+      }
+    }
+    if (dashboardPeriod === 'YEAR') {
+      return `Tahun ${new Date().getFullYear()}`;
+    }
+    return 'Semua Waktu';
+  };
   
   const lowStockProducts = products.filter(p => p.stock <= p.minStock);
   const outOfStockProducts = products.filter(p => p.stock === 0);
@@ -637,10 +752,10 @@ export default function Dashboard({
               ) : (
                 <div className="flex items-baseline justify-between mt-1">
                   <span className="text-xl font-black text-slate-800 font-mono block truncate">{formatRp(modalAwal)}</span>
-                  {userRole === 'OWNER' && activeSession && (
+                  {userRole === 'OWNER' && (
                     <button
                       onClick={() => {
-                        setRevisedDashboardOpening(activeSession.openingBalance.toLocaleString('id-ID'));
+                        setRevisedDashboardOpening(modalAwal.toLocaleString('id-ID'));
                         setIsEditingDashboardOpening(true);
                       }}
                       className="text-[10px] font-bold text-indigo-650 hover:underline flex items-center gap-0.5 ml-2 transition shrink-0"
@@ -786,7 +901,7 @@ export default function Dashboard({
                         <td className="px-3 py-2 text-slate-400 italic uppercase font-semibold">SALDO AWAL SEBELUM TRANSAKSI</td>
                         <td className="px-3 py-2 text-right text-slate-400">-</td>
                         <td className="px-3 py-2 text-right font-mono text-[11px] font-bold text-slate-600">
-                          {modalAwal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatRp(modalAwal)}
                         </td>
                         <td className="px-3 py-2 text-center print:hidden text-slate-400">-</td>
                       </tr>
@@ -1528,6 +1643,80 @@ export default function Dashboard({
         renderMutasiKasHarian(false)
       ) : (
         <div className="space-y-6 print:hidden">
+          {/* Period Filter Selector for Metrics */}
+          <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Filter Periode Ringkasan:</span>
+                <span className="text-xs font-black text-indigo-700">
+                  {getPeriodLabel()}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setDashboardPeriod('MONTH')}
+                className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
+                  dashboardPeriod === 'MONTH'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                📅 Bulan Ini
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDashboardPeriod('CUSTOM')}
+                className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
+                  dashboardPeriod === 'CUSTOM'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                🗓️ Pilih Bulan
+              </button>
+
+              {dashboardPeriod === 'CUSTOM' && (
+                <input
+                  type="month"
+                  value={selectedMonthYear}
+                  onChange={(e) => setSelectedMonthYear(e.target.value)}
+                  className="px-2.5 py-1 text-xs font-bold border-2 border-indigo-200 rounded-xl bg-white text-slate-800 outline-none focus:border-indigo-600 cursor-pointer"
+                />
+              )}
+
+              <button
+                type="button"
+                onClick={() => setDashboardPeriod('YEAR')}
+                className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
+                  dashboardPeriod === 'YEAR'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                📆 Tahun Ini
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDashboardPeriod('ALL')}
+                className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
+                  dashboardPeriod === 'ALL'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                🌐 Semua Waktu
+              </button>
+            </div>
+          </div>
+
           {/* Primary Statistics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="stats-grid">
             
@@ -1541,7 +1730,12 @@ export default function Dashboard({
                 <TrendingUp className="w-6 h-6" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Penjualan (Omset)</p>
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL PENJUALAN (OMSET)</p>
+                  <span className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                    {dashboardPeriod === 'MONTH' ? 'BULANAN' : dashboardPeriod === 'CUSTOM' ? 'OPSI BULAN' : dashboardPeriod === 'YEAR' ? 'TAHUNAN' : 'SEMUA'}
+                  </span>
+                </div>
                 <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-1">
                   {userRole !== 'OWNER' ? (
                     <span className="text-sm font-black text-slate-400 bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-1">🔒 Akses Owner</span>
@@ -1550,7 +1744,7 @@ export default function Dashboard({
                   )}
                 </h3>
                 <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1 mt-1">
-                  Dari <span className="font-bold text-indigo-600">{invoices.length}</span> nota pemesanan
+                  Dari <span className="font-bold text-indigo-600">{filteredDashboardInvoices.length}</span> nota pemesanan
                 </span>
               </div>
             </motion.div>
@@ -1565,7 +1759,12 @@ export default function Dashboard({
                 <Wallet className="w-6 h-6" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Kas Masuk</p>
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL KAS MASUK</p>
+                  <span className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                    {dashboardPeriod === 'MONTH' ? 'BULANAN' : dashboardPeriod === 'CUSTOM' ? 'OPSI BULAN' : dashboardPeriod === 'YEAR' ? 'TAHUNAN' : 'SEMUA'}
+                  </span>
+                </div>
                 <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-1">
                   {userRole !== 'OWNER' ? (
                     <span className="text-sm font-black text-slate-400 bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-1">🔒 Akses Owner</span>
@@ -1969,6 +2168,104 @@ export default function Dashboard({
                   />
                 </AreaChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Monthly Breakdown Table */}
+          <div className="mt-8 border-t border-indigo-100/80 pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                  📊 Tabel Rekapitulasi Omset &amp; Kas Masuk Bulanan
+                </h3>
+                <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                  Rincian historis performa omset, uang tunai masuk, sisa piutang, dan rasio pelunasan per bulan
+                </p>
+              </div>
+              <span className="text-xs font-mono font-extrabold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full self-start sm:self-auto">
+                {allMonthlySummaries.length} Bulan Recorded
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-indigo-100 shadow-3xs">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-indigo-50/70 text-indigo-800 font-extrabold uppercase tracking-wider text-[10px] border-b border-indigo-100">
+                    <th className="px-4 py-3">Bulan &amp; Tahun</th>
+                    <th className="px-4 py-3 text-center">Jumlah Nota</th>
+                    <th className="px-4 py-3 text-right">Total Penjualan (Omset)</th>
+                    <th className="px-4 py-3 text-right">Total Kas Masuk</th>
+                    <th className="px-4 py-3 text-right">Sisa Piutang</th>
+                    <th className="px-4 py-3 text-center">Efektivitas Pelunasan</th>
+                    <th className="px-4 py-3 text-center">Aksi Filter</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-indigo-50 bg-white">
+                  {allMonthlySummaries.map((m) => {
+                    const ratio = m.omset > 0 ? Math.round((m.kasMasuk / m.omset) * 100) : 0;
+                    const isSelected = dashboardPeriod === 'CUSTOM' && selectedMonthYear === m.monthKey;
+                    const isCurrentMonth = m.monthKey === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+                    return (
+                      <tr 
+                        key={m.monthKey} 
+                        className={`hover:bg-indigo-50/30 transition duration-150 ${isSelected ? 'bg-indigo-50/60 font-bold' : ''}`}
+                      >
+                        <td className="px-4 py-3.5 font-bold text-slate-800">
+                          <div className="flex items-center gap-2">
+                            <span className="font-sans font-black">{m.label}</span>
+                            {isCurrentMonth && (
+                              <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                                Bulan Ini
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-center font-mono font-bold text-slate-600">
+                          {m.count} nota ({m.qty} pcs)
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-mono font-black text-indigo-600 text-sm">
+                          {formatRp(m.omset)}
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-mono font-black text-emerald-600 text-sm">
+                          {formatRp(m.kasMasuk)}
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-500">
+                          {formatRp(m.piutang)}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden hidden sm:block">
+                              <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${ratio}%` }} />
+                            </div>
+                            <span className="font-mono font-bold text-slate-800 text-xs">{ratio}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDashboardPeriod('CUSTOM');
+                              setSelectedMonthYear(m.monthKey);
+                              const statsGrid = document.getElementById('stats-grid');
+                              if (statsGrid) {
+                                statsGrid.scrollIntoView({ behavior: 'smooth' });
+                              }
+                            }}
+                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition cursor-pointer border-none ${
+                              isSelected 
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'
+                            }`}
+                          >
+                            {isSelected ? '✓ Sedang Dipilih' : 'Filter Bulan Ini'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

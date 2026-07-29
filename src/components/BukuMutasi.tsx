@@ -84,7 +84,7 @@ export default function BukuMutasi({
   const [selectedMethod, setSelectedMethod] = useState<'ALL' | 'TRANSFER' | 'CASH'>('ALL');
   const [startingBalance, setStartingBalance] = useState<number>(() => {
     const saved = localStorage.getItem('athree_mutasi_starting_balance');
-    return saved ? Number(saved) : 782890318;
+    return saved ? Number(saved) : 500000;
   });
 
   // Editing transaction state for Owner
@@ -178,7 +178,20 @@ export default function BukuMutasi({
     localStorage.setItem('athree_mutasi_starting_balance', startingBalance.toString());
   }, [startingBalance]);
 
-  // Listener to keep bank accounts synchronized if they are modified in PengaturanToko
+  // Listener to keep bank accounts & starting balance synchronized
+  useEffect(() => {
+    const handleSyncStartingBalance = () => {
+      const saved = localStorage.getItem('athree_mutasi_starting_balance');
+      if (saved) {
+        setStartingBalance(Number(saved));
+      }
+    };
+    window.addEventListener('athree-starting-balance-changed', handleSyncStartingBalance);
+    return () => {
+      window.removeEventListener('athree-starting-balance-changed', handleSyncStartingBalance);
+    };
+  }, []);
+
   useEffect(() => {
     const handleSyncAccounts = () => {
       const saved = localStorage.getItem('athree_bank_accounts');
@@ -803,7 +816,7 @@ export default function BukuMutasi({
                 <td className="px-4 py-2 text-right text-slate-400">-</td>
                 <td className="px-4 py-2 text-right text-slate-400">-</td>
                 <td className="px-4 py-2 text-right font-mono text-[11px] font-bold text-slate-700">
-                  {effectiveStartingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatRp(effectiveStartingBalance)}
                 </td>
                 <td className="px-3 py-2 print:hidden"></td>
               </tr>
