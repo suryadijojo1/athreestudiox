@@ -385,3 +385,44 @@ export async function loadShopSettingsFromFirestore(): Promise<ShopSettings | nu
   }
 }
 
+export async function saveMutasiSettingsToFirestore(startingBalance: number): Promise<void> {
+  if (isQuotaExceeded) {
+    console.log(`[Offline Mode] Skipping saveMutasiSettingsToFirestore due to quota limit.`);
+    return;
+  }
+  try {
+    const docRef = doc(db, 'metadata', 'mutasi_settings');
+    await setDoc(docRef, cleanUndefined({ id: 'mutasi_settings', startingBalance }));
+  } catch (error) {
+    if (checkQuotaError(error)) {
+      return;
+    }
+    console.error('Gagal simpan mutasi_settings ke Firebase:', error);
+    handleFirestoreError(error, OperationType.WRITE, 'metadata/mutasi_settings');
+  }
+}
+
+export async function loadMutasiSettingsFromFirestore(): Promise<number | null> {
+  if (isQuotaExceeded) {
+    throw new Error('Quota limit exceeded');
+  }
+  try {
+    const docSnap = await getDocs(collection(db, 'metadata'));
+    let balance: number | null = null;
+    docSnap.forEach((ds) => {
+      if (ds.id === 'mutasi_settings') {
+        const data = ds.data();
+        if (typeof data.startingBalance === 'number') {
+          balance = data.startingBalance;
+        }
+      }
+    });
+    return balance;
+  } catch (error) {
+    checkQuotaError(error);
+    console.warn('Gagal memuat mutasi_settings dari Firebase:', error);
+    return null;
+  }
+}
+
+

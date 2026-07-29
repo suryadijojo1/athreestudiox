@@ -21,6 +21,8 @@ import {
   saveSalesAgentsToFirestore,
   saveShopSettingsToFirestore,
   loadShopSettingsFromFirestore,
+  saveMutasiSettingsToFirestore,
+  loadMutasiSettingsFromFirestore,
   SystemCredentials,
   db,
   getIsQuotaExceeded,
@@ -487,6 +489,12 @@ export default function App() {
         const dbCredentials = await loadCredentialsFromFirestore();
         const dbSalesAgents = await loadSalesAgentsFromFirestore();
         const dbShopSettings = await loadShopSettingsFromFirestore();
+        const dbMutasiSettings = await loadMutasiSettingsFromFirestore();
+
+        if (dbMutasiSettings !== null) {
+          localStorage.setItem('athree_mutasi_starting_balance', dbMutasiSettings.toString());
+          window.dispatchEvent(new Event('athree-starting-balance-changed'));
+        }
 
         if (dbCredentials) {
           if (dbCredentials.kasirPassword) {
@@ -785,6 +793,7 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         items.push(docSnap.data() as Product);
       });
+      lastSyncedProductsRef.current = items;
       setProducts((current) => {
         if (JSON.stringify(current) !== JSON.stringify(items)) {
           localStorage.setItem('nota_stok_products', JSON.stringify(items));
@@ -804,6 +813,7 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         items.push(docSnap.data() as Invoice);
       });
+      lastSyncedInvoicesRef.current = items;
       setInvoices((current) => {
         if (JSON.stringify(current) !== JSON.stringify(items)) {
           localStorage.setItem('nota_stok_invoices', JSON.stringify(items));
@@ -823,6 +833,7 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         items.push(docSnap.data() as StockMovement);
       });
+      lastSyncedMovementsRef.current = items;
       setMovements((current) => {
         if (JSON.stringify(current) !== JSON.stringify(items)) {
           localStorage.setItem('nota_stok_movements', JSON.stringify(items));
@@ -835,6 +846,26 @@ export default function App() {
       checkQuotaError(error);
     });
 
+    // Listen to 'audit_logs' collection
+    const unsubAuditLogs = onSnapshot(collection(db, 'audit_logs'), (snapshot) => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const items: AuditLog[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push(docSnap.data() as AuditLog);
+      });
+      lastSyncedAuditLogsRef.current = items;
+      setAuditLogs((current) => {
+        if (JSON.stringify(current) !== JSON.stringify(items)) {
+          localStorage.setItem('nota_stok_audit_logs', JSON.stringify(items));
+          return items;
+        }
+        return current;
+      });
+    }, (error) => {
+      console.error("Gagal listen audit_logs:", error);
+      checkQuotaError(error);
+    });
+
     // Listen to 'payment_transactions' collection
     const unsubPayments = onSnapshot(collection(db, 'payment_transactions'), (snapshot) => {
       if (snapshot.metadata.hasPendingWrites) return;
@@ -842,6 +873,7 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         items.push(docSnap.data() as PaymentTransaction);
       });
+      lastSyncedPaymentsRef.current = items;
       setPaymentTransactions((current) => {
         if (JSON.stringify(current) !== JSON.stringify(items)) {
           localStorage.setItem('nota_stok_payment_transactions', JSON.stringify(items));
@@ -861,6 +893,7 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         items.push(docSnap.data() as CashierSession);
       });
+      lastSyncedHistoryRef.current = items;
       setSessionsHistory((current) => {
         if (JSON.stringify(current) !== JSON.stringify(items)) {
           localStorage.setItem('nota_stok_sessions_history', JSON.stringify(items));
@@ -873,7 +906,7 @@ export default function App() {
       checkQuotaError(error);
     });
 
-    // Listen to 'metadata' collection for active_session, credentials, sales_agents, shop_settings
+    // Listen to 'metadata' collection for active_session, credentials, sales_agents, shop_settings, mutasi_settings
     const unsubMetadata = onSnapshot(collection(db, 'metadata'), (snapshot) => {
       if (snapshot.metadata.hasPendingWrites) return;
       snapshot.forEach((ds) => {
@@ -891,6 +924,14 @@ export default function App() {
             }
             return current;
           });
+        } else if (ds.id === 'mutasi_settings') {
+          if (typeof data.startingBalance === 'number') {
+            const currentVal = localStorage.getItem('athree_mutasi_starting_balance');
+            if (currentVal !== data.startingBalance.toString()) {
+              localStorage.setItem('athree_mutasi_starting_balance', data.startingBalance.toString());
+              window.dispatchEvent(new Event('athree-starting-balance-changed'));
+            }
+          }
         } else if (ds.id === 'credentials') {
           if (data.kasirPassword) {
             setKasirPassword((current) => {
@@ -965,6 +1006,7 @@ export default function App() {
       unsubProducts();
       unsubInvoices();
       unsubMovements();
+      unsubAuditLogs();
       unsubPayments();
       unsubHistory();
       unsubMetadata();
@@ -1041,6 +1083,100 @@ export default function App() {
       window.removeEventListener('athree-logo-changed', handleSyncLogoToCloud);
     };
   }, [firebaseStatus]);
+
+  useEffect(() => {
+    const handleSyncStartingBalanceToCloud = async () => {
+      try {
+        const saved = localStorage.getItem('athree_mutasi_starting_balance');
+        if (saved !== null && firebaseStatus === 'CONNECTED') {
+          await saveMutasiSettingsToFirestore(Number(saved));
+        }
+      } catch (e) {
+        console.error("Gagal sinkronisasi starting balance ke firestore:", e);
+      }
+    };
+    window.addEventListener('athree-starting-balance-changed', handleSyncStartingBalanceToCloud);
+    return () => {
+      window.removeEventListener('athree-starting-balance-changed', handleSyncStartingBalanceToCloud);
+    };
+  }, [firebaseStatus]);
+
+  // Cross-tab Synchronization (Multiple tabs in same browser)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!e.key) return;
+      try {
+        if (e.key === 'nota_stok_products' && e.newValue) setProducts(JSON.parse(e.newValue));
+        if (e.key === 'nota_stok_invoices' && e.newValue) setInvoices(JSON.parse(e.newValue));
+        if (e.key === 'nota_stok_movements' && e.newValue) setMovements(JSON.parse(e.newValue));
+        if (e.key === 'nota_stok_audit_logs' && e.newValue) setAuditLogs(JSON.parse(e.newValue));
+        if (e.key === 'nota_stok_payment_transactions' && e.newValue) setPaymentTransactions(JSON.parse(e.newValue));
+        if (e.key === 'nota_stok_sessions_history' && e.newValue) setSessionsHistory(JSON.parse(e.newValue));
+        if (e.key === 'nota_stok_active_session') setActiveSession(e.newValue ? JSON.parse(e.newValue) : null);
+        if (e.key === 'athree_mutasi_starting_balance') {
+          window.dispatchEvent(new Event('athree-starting-balance-changed'));
+        }
+      } catch (err) {
+        console.error("Gagal parse storage change:", err);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Automatic Re-sync on Tab Focus / Visibility Change across browsers & mobile devices
+  useEffect(() => {
+    const handleVisibilityOrFocus = async () => {
+      if (document.visibilityState === 'visible' && isDatabaseLoaded && !quotaExceeded) {
+        try {
+          const dbInvs = await loadCollectionFromFirestore<Invoice>('invoices');
+          if (dbInvs && dbInvs.length > 0) {
+            setInvoices(current => {
+              if (JSON.stringify(current) !== JSON.stringify(dbInvs)) {
+                localStorage.setItem('nota_stok_invoices', JSON.stringify(dbInvs));
+                lastSyncedInvoicesRef.current = dbInvs;
+                return dbInvs;
+              }
+              return current;
+            });
+          }
+          const dbProds = await loadCollectionFromFirestore<Product>('products');
+          if (dbProds && dbProds.length > 0) {
+            setProducts(current => {
+              if (JSON.stringify(current) !== JSON.stringify(dbProds)) {
+                localStorage.setItem('nota_stok_products', JSON.stringify(dbProds));
+                lastSyncedProductsRef.current = dbProds;
+                return dbProds;
+              }
+              return current;
+            });
+          }
+          const dbActiveSess = await loadActiveSessionFromFirestore();
+          setActiveSession(current => {
+            if (JSON.stringify(current) !== JSON.stringify(dbActiveSess)) {
+              if (dbActiveSess) {
+                localStorage.setItem('nota_stok_active_session', JSON.stringify(dbActiveSess));
+              } else {
+                localStorage.removeItem('nota_stok_active_session');
+              }
+              return dbActiveSess;
+            }
+            return current;
+          });
+        } catch (e) {
+          console.warn("Auto re-sync pada tab focus/visibility gagal:", e);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [isDatabaseLoaded, quotaExceeded]);
 
   // Highly-optimized Incremental Sync to keep Firestore write counts minimal and prevent exceeding daily free quotas
   const syncIncrementalToFirestore = async <T extends { id: string }>(
@@ -1633,6 +1769,56 @@ export default function App() {
     
     setIsFirebaseSyncing(true);
     try {
+      // 1. Pull latest data from Cloud Firestore first
+      const dbProducts = await loadCollectionFromFirestore<Product>('products');
+      const dbInvoices = await loadCollectionFromFirestore<Invoice>('invoices');
+      const dbMovements = await loadCollectionFromFirestore<StockMovement>('movements');
+      const dbAuditLogs = await loadCollectionFromFirestore<AuditLog>('audit_logs');
+      const dbPayments = await loadCollectionFromFirestore<PaymentTransaction>('payment_transactions');
+      const dbHistory = await loadCollectionFromFirestore<CashierSession>('sessions_history');
+      const dbActiveSession = await loadActiveSessionFromFirestore();
+      const dbMutasiSettings = await loadMutasiSettingsFromFirestore();
+
+      if (dbProducts.length > 0) {
+        setProducts(dbProducts);
+        lastSyncedProductsRef.current = dbProducts;
+        localStorage.setItem('nota_stok_products', JSON.stringify(dbProducts));
+      }
+      if (dbInvoices.length > 0) {
+        setInvoices(dbInvoices);
+        lastSyncedInvoicesRef.current = dbInvoices;
+        localStorage.setItem('nota_stok_invoices', JSON.stringify(dbInvoices));
+      }
+      if (dbMovements.length > 0) {
+        setMovements(dbMovements);
+        lastSyncedMovementsRef.current = dbMovements;
+        localStorage.setItem('nota_stok_movements', JSON.stringify(dbMovements));
+      }
+      if (dbAuditLogs.length > 0) {
+        setAuditLogs(dbAuditLogs);
+        lastSyncedAuditLogsRef.current = dbAuditLogs;
+        localStorage.setItem('nota_stok_audit_logs', JSON.stringify(dbAuditLogs));
+      }
+      if (dbPayments.length > 0) {
+        setPaymentTransactions(dbPayments);
+        lastSyncedPaymentsRef.current = dbPayments;
+        localStorage.setItem('nota_stok_payment_transactions', JSON.stringify(dbPayments));
+      }
+      if (dbHistory.length > 0) {
+        setSessionsHistory(dbHistory);
+        lastSyncedHistoryRef.current = dbHistory;
+        localStorage.setItem('nota_stok_sessions_history', JSON.stringify(dbHistory));
+      }
+      if (dbActiveSession) {
+        setActiveSession(dbActiveSession);
+        localStorage.setItem('nota_stok_active_session', JSON.stringify(dbActiveSession));
+      }
+      if (dbMutasiSettings !== null) {
+        localStorage.setItem('athree_mutasi_starting_balance', dbMutasiSettings.toString());
+        window.dispatchEvent(new Event('athree-starting-balance-changed'));
+      }
+
+      // 2. Push any local delta changes
       const syncPromises = [
         syncIncrementalToFirestore('products', products, lastSyncedProductsRef),
         syncIncrementalToFirestore('invoices', invoices, lastSyncedInvoicesRef),
@@ -1651,7 +1837,7 @@ export default function App() {
       setLastSyncTime(nowStr);
       localStorage.setItem('nota_stok_last_sync_time', nowStr);
       setFirebaseStatus('CONNECTED');
-      alert("Sinkronisasi Sukses! Semua data mutasi, nota, stok, dan sesi kasir telah berhasil dicadangkan ke Cloud Firestore.");
+      alert("Sinkronisasi Sukses! Semua data mutasi, nota, stok, dan sesi kasir telah berhasil disinkronkan dua arah dengan Cloud Firestore.");
     } catch (err: any) {
       console.error("Gagal melakukan sinkronisasi manual:", err);
       alert(`Gagal sinkronisasi data: ${err.message || err}`);
