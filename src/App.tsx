@@ -2402,29 +2402,13 @@ export default function App() {
                 Daftar Nota Pembayaran
               </button>
 
-              {/* Buku Mutasi Hari Ini */}
+              {/* Rekap Kasir, Mutasi & Closing Kas */}
               {userRole !== 'PRODUKSI' && (
-                <button
-                  id="tab-buku-mutasi"
-                  onClick={() => setActiveTab('buku-mutasi')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
-                    activeTab === 'buku-mutasi'
-                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-100'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-indigo-50/60'
-                  }`}
-                >
-                  <BookOpen className="w-4 h-4" />
-                  Buku Mutasi Hari Ini
-                </button>
-              )}
-
-              {/* Rekap Kasir & Closingan */}
-              {userRole === 'OWNER' && (
                 <button
                   id="tab-cash-drawer"
                   onClick={() => setActiveTab('kasir-closingan')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
-                    activeTab === 'kasir-closingan'
+                    activeTab === 'kasir-closingan' || activeTab === 'buku-mutasi'
                       ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-100'
                       : 'text-slate-500 hover:text-slate-800 hover:bg-indigo-50/60'
                   }`}
@@ -2432,10 +2416,10 @@ export default function App() {
                   <div className="relative">
                     <CreditCard className="w-4 h-4" />
                     {activeSession && (
-                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-555 rounded-full animate-pulse" />
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                     )}
                   </div>
-                  Kasir & Closing Kas
+                  Kasir, Mutasi & Closing Kas
                 </button>
               )}
 
@@ -2639,7 +2623,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'kasir-closingan' && userRole === 'OWNER' && (
+          {(activeTab === 'kasir-closingan' || activeTab === 'buku-mutasi') && userRole !== 'PRODUKSI' && (
             <KasirSesiPanel
               paymentTransactions={paymentTransactions}
               activeSession={activeSession}
@@ -2649,22 +2633,10 @@ export default function App() {
               onAddCustomTransaction={handleAddPaymentTransaction}
               onUpdateCustomTransaction={handleUpdatePaymentTransaction}
               onDeleteCustomTransaction={handleDeletePaymentTransaction}
-              userRole={userRole}
+              userRole={userRole === 'PRODUKSI' ? 'KASIR' : userRole}
               onUpdateSessionOpeningBalance={handleUpdateSessionOpeningBalance}
               onUpdateSessionHistory={handleUpdateSessionHistory}
-            />
-          )}
-
-          {activeTab === 'buku-mutasi' && (
-            <BukuMutasi
-              paymentTransactions={paymentTransactions}
-              onAddCustomTransaction={handleAddPaymentTransaction}
-              onUpdateCustomTransaction={handleUpdatePaymentTransaction}
-              onDeleteCustomTransaction={handleDeletePaymentTransaction}
-              userRole={userRole}
-              activeSession={activeSession}
-              sessionsHistory={sessionsHistory}
-              onUpdateSessionOpeningBalance={handleUpdateSessionOpeningBalance}
+              initialTab={activeTab === 'kasir-closingan' ? 'history' : 'mutasi'}
               onManualSync={handleManualSync}
               isSyncing={isFirebaseSyncing}
             />

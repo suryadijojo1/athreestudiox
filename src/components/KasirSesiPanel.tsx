@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CashierSession, PaymentTransaction } from '../types';
+import BukuMutasi from './BukuMutasi';
 import { 
   Lock, 
   Unlock, 
@@ -27,7 +28,8 @@ import {
   Check,
   X,
   Trash2,
-  Sparkles
+  Sparkles,
+  BookOpen
 } from 'lucide-react';
 
 interface KasirSesiPanelProps {
@@ -42,6 +44,9 @@ interface KasirSesiPanelProps {
   userRole: 'OWNER' | 'KASIR';
   onUpdateSessionOpeningBalance?: (newBalance: number) => void;
   onUpdateSessionHistory?: (sess: CashierSession) => void;
+  initialTab?: 'mutasi' | 'history';
+  onManualSync?: () => void;
+  isSyncing?: boolean;
 }
 
 export default function KasirSesiPanel({
@@ -55,10 +60,23 @@ export default function KasirSesiPanel({
   onDeleteCustomTransaction,
   userRole,
   onUpdateSessionOpeningBalance,
-  onUpdateSessionHistory
+  onUpdateSessionHistory,
+  initialTab = 'mutasi',
+  onManualSync,
+  isSyncing = false
 }: KasirSesiPanelProps) {
   
-  const [panelTab, setPanelTab] = useState<'active' | 'history'>('active');
+  const [panelTab, setPanelTab] = useState<'mutasi' | 'history'>(initialTab === 'history' ? 'history' : 'mutasi');
+
+  useEffect(() => {
+    if (initialTab) {
+      setPanelTab(initialTab === 'history' ? 'history' : 'mutasi');
+    }
+  }, [initialTab]);
+
+  // Modals state for opening / closing session without requiring a separate tab
+  const [showOpenSessionModal, setShowOpenSessionModal] = useState(false);
+  const [showCloseSessionModal, setShowCloseSessionModal] = useState(false);
   
   // Custom Transaction Form state
   const [showAddTx, setShowAddTx] = useState(false);
@@ -255,6 +273,7 @@ export default function KasirSesiPanel({
     // Initialize actualCash with current expected cash as convenient default
     setActualCash(openingBalance + cashIn - cashOut);
     setConfirmCashierAgreesToVerify(false);
+    setShowOpenSessionModal(false);
   };
 
   const handleCloseDesktop = (e: React.FormEvent) => {
@@ -262,6 +281,7 @@ export default function KasirSesiPanel({
     onCloseSession(actualCash, expectedCash, closingNotes);
     setShowClosingConfirm(false);
     setClosingNotes('');
+    setShowCloseSessionModal(false);
   };
 
   const handleCreateCustomTx = (e: React.FormEvent) => {
@@ -298,18 +318,18 @@ export default function KasirSesiPanel({
       {/* Upper header section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-indigo-100/40 dark:border-slate-800 shadow-xs">
         <div>
-          <span className="text-[11px] font-black tracking-wider uppercase text-indigo-505 bg-indigo-50 dark:bg-indigo-950/45 dark:text-indigo-400 px-3 py-1 rounded-full">
-            KASIR & CLOSINGAN
+          <span className="text-[11px] font-black tracking-wider uppercase text-indigo-500 bg-indigo-50 dark:bg-indigo-950/45 dark:text-indigo-400 px-3 py-1 rounded-full">
+            KASIR, MUTASI & CLOSING KAS
           </span>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-slate-150 tracking-tight mt-2 flex items-center gap-2">
-            📊 Rekap Kas Harian
+          <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight mt-2 flex items-center gap-2">
+            📊 Rekap Kas & Buku Mutasi Harian
           </h1>
           <p className="text-xs text-slate-400 font-medium mt-1 leading-relaxed">
-            Menghitung total uang tunai (cash) harian, mencocokkan saldo laci kasir, dan pelaporan closingan.
+            Menghitung total uang tunai harian, mencocokkan saldo laci kasir, mencatat mutasi kas, dan pelaporan closingan.
           </p>
         </div>
 
-        {/* Mini Status Pill badge */}
+        {/* Mini Status Pill badge & Action Buttons */}
         <div className="flex items-center gap-3">
           <div className={`p-4 rounded-2xl flex items-center gap-3 border ${
             activeSession 
@@ -317,7 +337,7 @@ export default function KasirSesiPanel({
               : 'bg-rose-50/50 border-rose-100/60 dark:bg-rose-950/20 dark:border-rose-900/40'
           }`}>
             <div className={`p-2.5 rounded-xl ${
-              activeSession ? 'bg-emerald-555 text-emerald-600' : 'bg-rose-555 text-rose-600'
+              activeSession ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
             }`}>
               {activeSession ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
             </div>
@@ -326,32 +346,56 @@ export default function KasirSesiPanel({
               <div className={`text-xs font-black ${
                 activeSession ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'
               }`}>
-                {activeSession ? '🟢 AKTIF (BUKA)' : '🔴 TUTUT (BELUM BANTU)'}
+                {activeSession ? '🟢 AKTIF (BUKA)' : '🔴 TUTUP (BELUM BUKA)'}
               </div>
             </div>
           </div>
+
+          {activeSession ? (
+            <button
+              onClick={() => {
+                setActualCash(expectedCash);
+                setShowClosingConfirm(true);
+                setShowCloseSessionModal(true);
+              }}
+              className="px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-2xl text-xs flex items-center gap-2 cursor-pointer shadow-sm transition"
+            >
+              <Lock className="w-4 h-4" />
+              Closing Kas
+            </button>
+          ) : (
+            userRole === 'OWNER' && (
+              <button
+                onClick={() => setShowOpenSessionModal(true)}
+                className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-2xl text-xs flex items-center gap-2 cursor-pointer shadow-sm transition"
+              >
+                <Unlock className="w-4 h-4" />
+                Buka Sesi Kasir
+              </button>
+            )
+          )}
         </div>
       </div>
 
-      {/* Tabs list selecting Active Session vs History Log */}
-      <div className="flex border-b border-indigo-100/30 dark:border-slate-800 pb-px">
+      {/* Tabs list selecting Buku Mutasi vs History Log */}
+      <div className="flex border-b border-indigo-100/30 dark:border-slate-800 pb-px gap-2 overflow-x-auto">
         <button
-          onClick={() => setPanelTab('active')}
-          className={`px-5 py-3 text-xs font-extrabold transition flex items-center gap-2 border-b-2 bg-transparent cursor-pointer ${
-            panelTab === 'active'
-              ? 'border-indigo-650 text-indigo-700 dark:text-indigo-400 font-extrabold border-b-2'
-              : 'border-transparent text-slate-400 hover:text-slate-650'
+          onClick={() => setPanelTab('mutasi')}
+          className={`px-5 py-3 text-xs font-extrabold transition flex items-center gap-2 border-b-2 bg-transparent cursor-pointer whitespace-nowrap ${
+            panelTab === 'mutasi'
+              ? 'border-indigo-600 text-indigo-700 dark:text-indigo-400 font-extrabold'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
           }`}
         >
-          <Briefcase className="w-4 h-4" />
-          Sesi Kasir Aktif
+          <BookOpen className="w-4 h-4" />
+          Buku Mutasi Kas Harian
         </button>
         <button
           onClick={() => setPanelTab('history')}
-          className={`px-5 py-3 text-xs font-extrabold transition flex items-center gap-2 border-b-2 bg-transparent cursor-pointer ${
+          className={`px-5 py-3 text-xs font-extrabold transition flex items-center gap-2 border-b-2 bg-transparent cursor-pointer whitespace-nowrap ${
             panelTab === 'history'
-              ? 'border-indigo-650 text-indigo-700 dark:text-indigo-400 font-extrabold border-b-2'
-              : 'border-transparent text-slate-400 hover:text-slate-650'
+              ? 'border-indigo-600 text-indigo-700 dark:text-indigo-400 font-extrabold'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
           }`}
         >
           <History className="w-4 h-4" />
@@ -359,8 +403,226 @@ export default function KasirSesiPanel({
         </button>
       </div>
 
-      {/* Tab Area: Active Session */}
-      {panelTab === 'active' && (
+      {/* Modal: Buka Sesi Kasir */}
+      {showOpenSessionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-indigo-100 dark:border-slate-800 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-5 relative">
+            <button
+              type="button"
+              onClick={() => setShowOpenSessionModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 p-2 rounded-full transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-2xl">
+                <Unlock className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">Buka Sesi Kasir Baru</h3>
+                <p className="text-xs text-slate-400 font-medium">Masukkan saldo modal awal untuk memulai penerimaan kas.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleOpenDesktop} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5" htmlFor="opening-balance-modal">
+                  💵 Modal Awal Laci Kasir (Rp)
+                </label>
+                <input
+                  type="text"
+                  id="opening-balance-modal"
+                  required
+                  placeholder="Contoh: 200.000"
+                  value={openingBalance === 0 ? '' : openingBalance.toLocaleString('id-ID')}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    const numVal = val ? parseInt(val, 10) : 0;
+                    setOpeningBalance(numVal);
+                    setActualCash(numVal);
+                  }}
+                  className="w-full px-4 py-3 text-base bg-white dark:bg-slate-800 border bg-indigo-50/5 border-indigo-50 dark:border-slate-700 rounded-xl text-slate-800 dark:text-white outline-none focus:border-indigo-500 font-mono font-bold transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5" htmlFor="close-interval-modal">
+                  ⏱️ Interval Penutupan Sesi
+                </label>
+                <select
+                  id="close-interval-modal"
+                  value={closeInterval}
+                  onChange={(e) => setCloseInterval(e.target.value)}
+                  className="w-full px-4 py-3 text-xs bg-white dark:bg-slate-800 border border-indigo-50 dark:border-slate-700 rounded-xl text-slate-800 dark:text-white outline-none focus:border-indigo-500 font-bold transition"
+                >
+                  <option value="DAILY">Akhir Hari / Harian</option>
+                  <option value="SHIFT">Akhir Shift</option>
+                  <option value="MANUAL">Manual / Sesuai Kebutuhan</option>
+                </select>
+              </div>
+
+              <div className="flex items-start gap-2.5 bg-amber-50/30 dark:bg-amber-950/10 p-3.5 rounded-xl border border-amber-100/40 text-left">
+                <input
+                  type="checkbox"
+                  id="confirm-physical-modal"
+                  checked={confirmCashierAgreesToVerify}
+                  onChange={(e) => setConfirmCashierAgreesToVerify(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                />
+                <label htmlFor="confirm-physical-modal" className="text-[10px] text-slate-650 dark:text-slate-350 font-bold select-none cursor-pointer leading-normal">
+                  Saya menyatakan telah menghitung uang fisik secara langsung & memastikan saldo fisik laci COCOK dengan saldo modal awal sistem.
+                </label>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOpenSessionModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={!confirmCashierAgreesToVerify}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-extrabold text-white transition flex items-center gap-1.5 ${
+                    confirmCashierAgreesToVerify
+                      ? 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer shadow-sm'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  <Unlock className="w-3.5 h-3.5" />
+                  Buka Sesi Kasir Now
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Closing Sesi Kasir */}
+      {showCloseSessionModal && activeSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-indigo-100 dark:border-slate-800 rounded-3xl p-6 shadow-2xl max-w-lg w-full space-y-5 relative">
+            <button
+              type="button"
+              onClick={() => setShowCloseSessionModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 p-2 rounded-full transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-2xl">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">🔒 Closing Sesi Kasir</h3>
+                <p className="text-xs text-slate-400 font-medium">Hitung uang tunai di laci & kunci pembukuan sesi ini.</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-indigo-50/20 dark:bg-indigo-950/15 rounded-2xl space-y-2 border border-indigo-100/20 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Modal Awal:</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{formatRp(activeSession.openingBalance)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Total Setoran Tunai Masuk:</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatRp(cashIn)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Total Pengeluaran Tunai:</span>
+                <span className="font-mono font-bold text-rose-600 dark:text-rose-400">{formatRp(cashOut)}</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-indigo-100/40 dark:border-slate-800 font-bold">
+                <span className="text-indigo-600 dark:text-indigo-400">Estimasi Cash di Laci:</span>
+                <strong className="font-mono text-sm text-slate-900 dark:text-slate-100 font-black">{formatRp(expectedCash)}</strong>
+              </div>
+            </div>
+
+            {userRole === 'OWNER' ? (
+              <form onSubmit={handleCloseDesktop} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2" htmlFor="modal-actual-cash">
+                    💵 Uang Cash Fisik di Laci (Rp)
+                  </label>
+                  <input
+                    type="text"
+                    id="modal-actual-cash"
+                    required
+                    value={actualCash === 0 ? '' : actualCash.toLocaleString('id-ID')}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setActualCash(val ? parseInt(val, 10) : 0);
+                    }}
+                    className="w-full px-4 py-2.5 text-base bg-rose-50/10 dark:bg-rose-950/10 border-2 border-rose-100 focus:border-rose-500 rounded-xl text-slate-800 dark:text-white outline-none font-mono font-bold transition"
+                  />
+                </div>
+
+                {(() => {
+                  const selisih = actualCash - expectedCash;
+                  return (
+                    <div className={`p-4 rounded-2xl border text-xs ${
+                      selisih === 0
+                        ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-400'
+                        : 'bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/30 text-rose-800 dark:text-rose-400'
+                    }`}>
+                      <div className="font-extrabold flex items-center gap-1.5">
+                        {selisih === 0 ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <AlertCircle className="w-4 h-4 text-rose-500" />}
+                        <span>
+                          {selisih === 0 
+                            ? 'Sempurna! Saldo COCOK (Rp 0)' 
+                            : `Selisih: ${selisih > 0 ? 'Surplus (Uang Lebih)' : 'Defisit (Uang Kurang)'} ${formatRp(Math.abs(selisih))}`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5" htmlFor="modal-closing-notes">
+                    Catatan Closing Sesi
+                  </label>
+                  <textarea
+                    id="modal-closing-notes"
+                    rows={2}
+                    placeholder="Contoh: Sesi hari ini aman dan lengkap."
+                    value={closingNotes}
+                    onChange={(e) => setClosingNotes(e.target.value)}
+                    className="w-full px-4 py-2.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCloseSessionModal(false)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl cursor-pointer shadow-sm flex items-center gap-1.5"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    Simpan & Tutup Sesi Sekarang
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 text-rose-700 dark:text-rose-400 rounded-xl text-xs font-bold">
+                Hanya Owner yang berwenang menutup sesi kasir.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab Area: Active Session (Disabled) */}
+      {false && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Active Session is NULL: Prompt to open session */}
@@ -1038,6 +1300,22 @@ export default function KasirSesiPanel({
           )}
 
         </div>
+      )}
+
+      {/* Tab Area: Buku Mutasi Kas Harian */}
+      {panelTab === 'mutasi' && (
+        <BukuMutasi
+          paymentTransactions={paymentTransactions}
+          onAddCustomTransaction={onAddCustomTransaction || (() => {})}
+          onUpdateCustomTransaction={onUpdateCustomTransaction}
+          onDeleteCustomTransaction={onDeleteCustomTransaction}
+          userRole={userRole}
+          activeSession={activeSession}
+          sessionsHistory={sessionsHistory}
+          onUpdateSessionOpeningBalance={onUpdateSessionOpeningBalance}
+          onManualSync={onManualSync}
+          isSyncing={isSyncing}
+        />
       )}
 
       {/* Tab Area: Sessions History Logs */}
