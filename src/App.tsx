@@ -41,6 +41,7 @@ import HistoriAktivitas from './components/HistoriAktivitas';
 import PengaturanToko from './components/PengaturanToko';
 import KasirSesiPanel from './components/KasirSesiPanel';
 import BukuMutasi from './components/BukuMutasi';
+import DeadlineTicker from './components/DeadlineTicker';
 
 // Icon imports
 import { 
@@ -153,7 +154,7 @@ export default function App() {
     }
   };
 
-  const handleLoginSuccess = (role: 'KASIR' | 'OWNER' | 'PRODUKSI') => {
+  const handleLoginSuccess = async (role: 'KASIR' | 'OWNER' | 'PRODUKSI') => {
     setUserRole(role);
     setIsLoggedIn(true);
     localStorage.setItem('athree_user_role', role);
@@ -163,9 +164,22 @@ export default function App() {
     } else {
       setActiveTab('dashboard');
     }
+
+    // Auto-update & sync latest cloud data upon login
+    try {
+      await handleManualSync(true);
+    } catch (e) {
+      console.warn("Auto sync on login failed:", e);
+    }
   };
 
   const handleLogout = async () => {
+    // Auto-sync local state to cloud before logging out
+    try {
+      await handleManualSync(true);
+    } catch (e) {
+      console.warn("Auto sync on logout failed:", e);
+    }
     setIsLoggedIn(false);
     localStorage.removeItem('athree_logged_in');
   };
@@ -1761,9 +1775,9 @@ export default function App() {
     }
   };
 
-  const handleManualSync = async () => {
+  const handleManualSync = async (silent: boolean = false) => {
     if (quotaExceeded) {
-      alert("Gagal melakukan sinkronisasi: Batas kuota cloud harian terlampaui.");
+      if (!silent) alert("Gagal melakukan sinkronisasi: Batas kuota cloud harian terlampaui.");
       return;
     }
     
@@ -1837,10 +1851,14 @@ export default function App() {
       setLastSyncTime(nowStr);
       localStorage.setItem('nota_stok_last_sync_time', nowStr);
       setFirebaseStatus('CONNECTED');
-      alert("Sinkronisasi Sukses! Semua data mutasi, nota, stok, dan sesi kasir telah berhasil disinkronkan dua arah dengan Cloud Firestore.");
+      if (!silent) {
+        alert("Sinkronisasi Sukses! Semua data mutasi, nota, stok, dan sesi kasir telah berhasil disinkronkan dua arah dengan Cloud Firestore.");
+      }
     } catch (err: any) {
       console.error("Gagal melakukan sinkronisasi manual:", err);
-      alert(`Gagal sinkronisasi data: ${err.message || err}`);
+      if (!silent) {
+        alert(`Gagal sinkronisasi data: ${err.message || err}`);
+      }
     } finally {
       setIsFirebaseSyncing(false);
     }
@@ -2806,6 +2824,7 @@ export default function App() {
               lastSyncTime={lastSyncTime}
               activeSession={activeSession}
               paymentTransactions={paymentTransactions}
+              sessionsHistory={sessionsHistory}
               onAddCustomTransaction={handleAddPaymentTransaction}
               onUpdateCustomTransaction={handleUpdatePaymentTransaction}
               onDeleteCustomTransaction={handleDeletePaymentTransaction}
@@ -2921,6 +2940,12 @@ export default function App() {
           paymentTransactions={paymentTransactions}
         />
       )}
+
+      {/* Running Text Ticker for Urgent Deadlines (< 4 days) */}
+      <DeadlineTicker 
+        invoices={invoices} 
+        onSelectInvoice={(inv) => setSelectedInvoice(inv)} 
+      />
 
       {/* Transient overlay specifically for Instant Quick-Printing without opening full modal on-screen */}
       {quickPrintInvoice && (

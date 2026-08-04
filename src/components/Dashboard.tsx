@@ -5,7 +5,8 @@
 
 import React from 'react';
 import { Product, Invoice, AuditLog, CashierSession, PaymentTransaction } from '../types';
-import { TrendingUp, Wallet, Landmark, AlertTriangle, ArrowUpRight, ArrowDownRight, Package, Lock, Calendar, Clock, Printer, X, AlertCircle, Download, Database, ChevronDown, ChevronUp, Check, Settings, RefreshCw, Layers, CheckCircle2, Activity, Edit, Trash2, Coins, RotateCcw, Users, BookOpen } from 'lucide-react';
+import LaporanSalesCategoryModal from './LaporanSalesCategoryModal';
+import { TrendingUp, Wallet, Landmark, AlertTriangle, ArrowUpRight, ArrowDownRight, Package, Lock, Calendar, Clock, Printer, X, AlertCircle, Download, Database, ChevronDown, ChevronUp, Check, Settings, RefreshCw, Layers, CheckCircle2, Activity, Edit, Trash2, Coins, RotateCcw, Users, BookOpen, FileSpreadsheet } from 'lucide-react';
 import { motion } from 'motion/react';
 import { 
   ResponsiveContainer, 
@@ -63,11 +64,22 @@ interface DashboardProps {
   lastSyncTime?: string;
   activeSession: CashierSession | null;
   paymentTransactions: PaymentTransaction[];
+  sessionsHistory?: CashierSession[];
   onAddCustomTransaction?: (tx: PaymentTransaction) => void;
   onUpdateCustomTransaction?: (tx: PaymentTransaction) => void;
   onDeleteCustomTransaction?: (txId: string) => void;
   onUpdateSessionOpeningBalance?: (newBalance: number) => void;
 }
+
+const getLocalDateString = (dInput?: Date | string | number): string => {
+  if (!dInput) return '';
+  const d = new Date(dInput);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function Dashboard({ 
   products, 
@@ -79,6 +91,7 @@ export default function Dashboard({
   lastSyncTime, 
   activeSession, 
   paymentTransactions,
+  sessionsHistory = [],
   onAddCustomTransaction,
   onUpdateCustomTransaction,
   onDeleteCustomTransaction,
@@ -199,6 +212,7 @@ export default function Dashboard({
   // Sales Performance Report States and Aggregations
   const [salesDateFilter, setSalesDateFilter] = React.useState<'ALL' | 'MONTH' | 'WEEK'>('ALL');
   const [selectedSalesCode, setSelectedSalesCode] = React.useState<string | null>(null);
+  const [showSalesCategoryReportModal, setShowSalesCategoryReportModal] = React.useState(false);
 
   // Primary Metrics Period Filter States (Perbulan / ALL / YEAR / CUSTOM)
   const [dashboardPeriod, setDashboardPeriod] = React.useState<'MONTH' | 'ALL' | 'YEAR' | 'CUSTOM'>('MONTH');
@@ -452,8 +466,11 @@ export default function Dashboard({
     });
   }, [paymentTransactions, selectedMutationDate]);
 
-  // Load sessions from local storage to find Modal Awal (opening balance)
+  // Load sessions from prop or local storage to find Modal Awal (opening balance)
   const sessions = React.useMemo(() => {
+    if (sessionsHistory && sessionsHistory.length > 0) {
+      return sessionsHistory;
+    }
     try {
       const stored = localStorage.getItem('nota_stok_sessions_history');
       if (stored) {
@@ -463,16 +480,16 @@ export default function Dashboard({
       console.error("Gagal memuat sessions history di Dashboard:", e);
     }
     return [];
-  }, [selectedMutationDate, activeSession]);
+  }, [sessionsHistory]);
 
   const modalAwal = React.useMemo(() => {
-    const todayStrValue = new Date().toISOString().split('T')[0];
+    const todayStrValue = getLocalDateString(new Date());
     if (selectedMutationDate === todayStrValue && activeSession) {
       return activeSession.openingBalance;
     }
     const matchedSession = sessions.find(s => {
       try {
-        const sDate = new Date(s.openedAt).toISOString().split('T')[0];
+        const sDate = getLocalDateString(s.openedAt);
         return sDate === selectedMutationDate;
       } catch {
         return false;
@@ -2322,16 +2339,28 @@ export default function Dashboard({
                 </button>
               </div>
 
-              {/* Export Button */}
+              {/* Export Buttons */}
               {salesPerformanceData.length > 0 && (
-                <button
-                  onClick={handleExportSalesCSV}
-                  className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-emerald-500 text-emerald-600 hover:bg-emerald-50 focus:bg-emerald-55 font-extrabold text-xs uppercase tracking-wider cursor-pointer rounded-2xl transition-all shadow-xs"
-                  id="btn-export-sales-csv"
-                >
-                  <Download className="w-4 h-4 text-emerald-600" />
-                  <span>Ekspor CSV</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setShowSalesCategoryReportModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer rounded-2xl transition-all shadow-md shadow-indigo-600/20 active:scale-95"
+                    id="btn-open-sales-category-report"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-white" />
+                    <span>Laporan Sales &amp; Jenis Produk</span>
+                  </button>
+
+                  <button
+                    onClick={handleExportSalesCSV}
+                    className="flex items-center gap-2 px-3.5 py-2 border-2 border-dashed border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-extrabold text-xs uppercase tracking-wider cursor-pointer rounded-2xl transition-all shadow-xs"
+                    id="btn-export-sales-csv"
+                    title="Unduh CSV Ringkasan Sales Agent"
+                  >
+                    <Download className="w-4 h-4 text-emerald-600" />
+                    <span>CSV Sales</span>
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -3135,6 +3164,16 @@ export default function Dashboard({
           </div>
         </div>
       )}
+
+      {/* Sales & Product Category Report Modal */}
+      <LaporanSalesCategoryModal
+        isOpen={showSalesCategoryReportModal}
+        onClose={() => setShowSalesCategoryReportModal(false)}
+        invoices={invoices}
+        products={products}
+        officialSalesList={officialSalesList}
+        salesDateFilter={salesDateFilter}
+      />
 
     </div>
   );

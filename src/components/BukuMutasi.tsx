@@ -40,6 +40,16 @@ interface BankAccount {
   accountOwner: string;
 }
 
+const getLocalDateString = (dInput?: Date | string | number): string => {
+  if (!dInput) return '';
+  const d = new Date(dInput);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function BukuMutasi({
   paymentTransactions,
   onAddCustomTransaction,
@@ -78,7 +88,7 @@ export default function BukuMutasi({
   const [customAccountOwner, setCustomAccountOwner] = useState('LUKMAN HAKIM');
 
   // Filter settings
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString(new Date());
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(todayStr);
   const [selectedMethod, setSelectedMethod] = useState<'ALL' | 'TRANSFER' | 'CASH'>('ALL');
@@ -145,13 +155,13 @@ export default function BukuMutasi({
   // Find session for start date to match cash drawer opening balance
   const sessionForStartDate = useMemo(() => {
     if (!startDate) return null;
-    const todayStrValue = new Date().toISOString().split('T')[0];
+    const todayStrValue = getLocalDateString(new Date());
     if (startDate === todayStrValue && activeSession) {
       return activeSession;
     }
     const matchedSession = (sessionsHistory || []).find(s => {
       try {
-        const openedDateStr = s.openedAt.split('T')[0];
+        const openedDateStr = getLocalDateString(s.openedAt);
         return openedDateStr === startDate;
       } catch (e) {
         return false;
@@ -167,7 +177,7 @@ export default function BukuMutasi({
 
   const handleStartingBalanceChange = (newVal: number) => {
     setStartingBalance(newVal);
-    const todayStrValue = new Date().toISOString().split('T')[0];
+    const todayStrValue = getLocalDateString(new Date());
     if (startDate === todayStrValue && activeSession && onUpdateSessionOpeningBalance) {
       onUpdateSessionOpeningBalance(newVal);
     }
@@ -254,7 +264,7 @@ export default function BukuMutasi({
     // Filter POS payment transactions
     const filteredTx = paymentTransactions.filter(tx => {
       // Date filter
-      const txDate = tx.timestamp.split('T')[0];
+      const txDate = getLocalDateString(tx.timestamp);
       if (txDate < startDate || txDate > endDate) return false;
 
       // Method filter
@@ -326,7 +336,7 @@ export default function BukuMutasi({
   // Comprehensive daily summary calculation for starting balance, incomes, expenses, for both transfer & cash
   const summaryDetails = useMemo(() => {
     const txsInPeriod = paymentTransactions.filter(tx => {
-      const txDate = tx.timestamp.split('T')[0];
+      const txDate = getLocalDateString(tx.timestamp);
       return txDate >= startDate && txDate <= endDate;
     });
 

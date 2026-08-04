@@ -22,6 +22,7 @@ import {
   Database,
   Package,
   Pencil,
+  Gauge,
   X
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -96,6 +97,29 @@ export default function PengaturanToko({
       kbSize: (totalBytes / 1024).toFixed(1),
       itemCount
     });
+  };
+
+  const [runningTextSpeed, setRunningTextSpeed] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nota_running_text_speed');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed > 5) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return 95;
+  });
+
+  const handleSelectRunningTextSpeed = (speed: number) => {
+    setRunningTextSpeed(speed);
+    try {
+      localStorage.setItem('nota_running_text_speed', String(speed));
+      window.dispatchEvent(new CustomEvent('nota-running-text-speed-changed', { detail: speed }));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   useEffect(() => {
@@ -945,12 +969,51 @@ export default function PengaturanToko({
             </div>
           </div>
 
+          {/* Running Text Speed Settings Panel */}
+          <div className="bg-white border border-indigo-100 rounded-3xl p-6 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span className="w-1.5 h-3 bg-indigo-500 rounded-full" />
+              <Gauge className="w-4 h-4 text-indigo-500" />
+              5. Kecepatan Running Text Nota Deadline (≤ 7 Hari / H-1 s/d H-7)
+            </h3>
+            
+            <p className="text-xs text-slate-500 font-medium">
+              Atur kelajuan teks berjalan (marquee) di bilah paling bawah layar yang menampilkan pengingat nota deadline jatuh tempo. Pilihan ini dapat langsung dirasakan perubahan kecepatannya.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+              {[
+                { label: 'Sangat Lambat', val: 140, sub: '140s / siklus' },
+                { label: 'Lambat', val: 95, sub: '95s / siklus' },
+                { label: 'Sedang', val: 60, sub: '60s / siklus' },
+                { label: 'Cepat', val: 35, sub: '35s / siklus' },
+                { label: 'Sangat Cepat', val: 18, sub: '18s / siklus' },
+              ].map((opt) => (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => handleSelectRunningTextSpeed(opt.val)}
+                  className={`p-3 rounded-2xl border text-center transition cursor-pointer ${
+                    runningTextSpeed === opt.val
+                      ? 'border-indigo-500 bg-indigo-600 text-white font-black shadow-xs'
+                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold'
+                  }`}
+                >
+                  <div className="text-xs">{opt.label}</div>
+                  <div className={`text-[10px] mt-0.5 font-medium ${runningTextSpeed === opt.val ? 'text-indigo-100' : 'text-slate-400'}`}>
+                    {opt.sub}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Wallpaper Login Settings Panel */}
           <div className="bg-white border border-indigo-100 rounded-3xl p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <span className="w-1.5 h-3 bg-indigo-500 rounded-full" />
               <ImageIcon className="w-4 h-4 text-indigo-500" />
-              5. Wallpaper Tampilan Awal Login
+              6. Wallpaper Tampilan Awal Login
             </h3>
             
             <p className="text-xs text-slate-500 font-medium">
