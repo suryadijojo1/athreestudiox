@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Invoice } from '../types';
-import { Search, Eye, CircleDollarSign, Calendar, ChevronRight, Filter, Receipt, Edit, Printer, AlertTriangle, Clock, Info, Bell, Trash2 } from 'lucide-react';
+import { Search, Eye, CircleDollarSign, Calendar, ChevronRight, Filter, Receipt, Edit, Printer, AlertTriangle, Clock, Info, Bell, Trash2, LayoutGrid, List } from 'lucide-react';
+import JobSpecCard from './JobSpecCard';
 
 interface NotaListProps {
   invoices: Invoice[];
@@ -21,10 +22,20 @@ interface NotaListProps {
 export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, onUpdateProductionStatus, onEditInvoice, onQuickPrint, onDeleteInvoice, userRole = 'OWNER' }: NotaListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'SEMAU' | 'LUNAS' | 'DP' | 'BELUM_BAYAR'>('SEMAU');
-  const [productionFilter, setProductionFilter] = useState<'SEMAU' | 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL'>('SEMAU');
+  const [productionFilter, setProductionFilter] = useState<'SEMAU' | 'AKTIF_PRODUKSI' | 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL'>(
+    userRole === 'PRODUKSI' ? 'AKTIF_PRODUKSI' : 'SEMAU'
+  );
+
+  useEffect(() => {
+    if (userRole === 'PRODUKSI') {
+      setProductionFilter('AKTIF_PRODUKSI');
+      setViewMode('cards');
+    }
+  }, [userRole]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [deadlineAlertFilter, setDeadlineAlertFilter] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>(userRole === 'PRODUKSI' ? 'cards' : 'table');
   
   // Settle amount handler state per invoice (for inline partial payment popups)
   const [settleInvoiceId, setSettleInvoiceId] = useState<string | null>(null);
@@ -248,7 +259,11 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     if (statusFilter !== 'SEMAU' && inv.status !== statusFilter) return false;
 
     // Check production status filter
-    if (productionFilter !== 'SEMAU') {
+    if (productionFilter === 'AKTIF_PRODUKSI') {
+      const currentProdStatus = inv.productionStatus || 'ANTREAN';
+      const isActiveStatus = currentProdStatus === 'ANTREAN' || currentProdStatus === 'DESAIN' || currentProdStatus === 'PROSES';
+      if (!isActiveStatus) return false;
+    } else if (productionFilter !== 'SEMAU') {
       const currentProdStatus = inv.productionStatus || 'ANTREAN';
       if (currentProdStatus !== productionFilter) return false;
     }
@@ -435,6 +450,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
               onChange={(e) => setProductionFilter(e.target.value as any)}
               className="bg-slate-50 border-2 border-indigo-50/50 hover:border-indigo-200 focus:border-indigo-500 text-xs font-black text-slate-705 rounded-xl px-2.5 py-1 outline-none transition cursor-pointer"
             >
+              <option value="AKTIF_PRODUKSI">🔥 ANTREAN s/d PROSES (KERJAAN AKTIF)</option>
               <option value="SEMAU">✨ SEMUA PEKERJAAN</option>
               <option value="ANTREAN">⏳ ANTREAN</option>
               <option value="DESAIN">✏️ TAHAP DESAIN</option>
@@ -444,10 +460,63 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
               <option value="SUDAH_DIAMBIL">🤝 SUDAH DI AMBIL</option>
             </select>
           </div>
+
+          {/* Toggle View Mode: Tabel vs Kartu SPK Pekerjaan */}
+          <div className="flex items-center bg-white p-1 border-2 border-indigo-100 rounded-2xl shadow-sm shrink-0">
+            <button
+              type="button"
+              id="view-mode-table-btn"
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-indigo-600'
+              }`}
+              title="Tampilan Tabel Nota"
+            >
+              <List className="w-3.5 h-3.5" />
+              Tabel
+            </button>
+            <button
+              type="button"
+              id="view-mode-cards-btn"
+              onClick={() => setViewMode('cards')}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'cards'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-indigo-600'
+              }`}
+              title="Tampilan Kartu Spesifikasi Pekerjaan"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              Kartu Pekerjaan
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main Table Panel closely styled like the screenshot */}
+      {viewMode === 'cards' ? (
+        <div className="space-y-4">
+          {filteredInvoices.length === 0 ? (
+            <div className="bg-white border-2 border-indigo-100 rounded-3xl p-12 text-center text-slate-400 font-bold">
+              Tidak ditemukan pekerjaan produksi dengan kriteria pencarian ini.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredInvoices.map((inv) => (
+                <JobSpecCard
+                  key={inv.id}
+                  invoice={inv}
+                  onSelect={onSelectInvoice}
+                  onUpdateProductionStatus={onUpdateProductionStatus}
+                  showStatusDropdown={true}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+      /* Main Table Panel closely styled like the screenshot */
       <div className="bg-white border-2 border-indigo-100 rounded-3xl overflow-hidden shadow-sm" id="invoices-main-table-card">
         <div className="overflow-auto max-h-[650px]">
           <table className="w-full text-left border-collapse font-sans text-[11px] md:text-xs lg:text-[13px]">
@@ -683,6 +752,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
           </table>
         </div>
       </div>
+      )}
 
       {/* Pop-up Dialog: Installment / Settle Payment */}
       {settleInvoiceId && (

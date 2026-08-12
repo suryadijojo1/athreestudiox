@@ -208,6 +208,13 @@ export default function App() {
     return (localStorage.getItem('athree_theme') as 'light' | 'dark') || 'light';
   });
 
+  // Ensure userRole === 'PRODUKSI' stays on 'daftar-nota' tab
+  useEffect(() => {
+    if (userRole === 'PRODUKSI' && activeTab !== 'daftar-nota') {
+      setActiveTab('daftar-nota');
+    }
+  }, [userRole, activeTab]);
+
   // Dynamically apply/remove dark class from HTML document element
   useEffect(() => {
     const root = window.document.documentElement;
@@ -2614,18 +2621,20 @@ export default function App() {
             <nav className="p-4 space-y-1.5">
               
               {/* Dashboard */}
-              <button
-                id="tab-dashboard"
-                onClick={() => setActiveTab('dashboard')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
-                  activeTab === 'dashboard'
-                    ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-100'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-indigo-50/60'
-                }`}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                Peninjauan Dashboard
-              </button>
+              {userRole !== 'PRODUKSI' && (
+                <button
+                  id="tab-dashboard"
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
+                    activeTab === 'dashboard'
+                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-100'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-indigo-50/60'
+                  }`}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  Peninjauan Dashboard
+                </button>
+              )}
 
               {/* Tulis Nota Baru */}
               {userRole !== 'PRODUKSI' && (
@@ -2646,7 +2655,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* Daftar Invoices / Laporan Piutang */}
+              {/* Daftar Invoices / Laporan Piutang / SPK Produksi */}
               <button
                 id="tab-invoice-list"
                 onClick={() => setActiveTab('daftar-nota')}
@@ -2657,7 +2666,7 @@ export default function App() {
                 }`}
               >
                 <Receipt className="w-4 h-4" />
-                Daftar Nota Pembayaran
+                {userRole === 'PRODUKSI' ? 'Daftar Pekerjaan Produksi' : 'Daftar Nota Pembayaran'}
               </button>
 
               {/* Rekap Kasir, Mutasi & Closing Kas */}
@@ -2749,34 +2758,36 @@ export default function App() {
           </div>
 
           {/* Quick Settings Action: Reset database & Playground controls */}
-          <div className="p-4 border-t border-indigo-100 space-y-2 bg-indigo-50/10">
-            <button
-              id="sidebar-btn-clear-cache"
-              onClick={() => setIsClearCacheModalOpen(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-amber-700 rounded-xl text-xs font-bold transition duration-155 cursor-pointer shadow-3xs"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-amber-500" />
-              Menu Hapus Cache
-            </button>
+          {userRole !== 'PRODUKSI' && (
+            <div className="p-4 border-t border-indigo-100 space-y-2 bg-indigo-50/10">
+              <button
+                id="sidebar-btn-clear-cache"
+                onClick={() => setIsClearCacheModalOpen(true)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-amber-700 rounded-xl text-xs font-bold transition duration-155 cursor-pointer shadow-3xs"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-amber-500" />
+                Menu Hapus Cache
+              </button>
 
-            <button
-              id="sidebar-btn-seed-simulation"
-              onClick={userRole === 'OWNER' ? handleResetToPresets : undefined}
-              disabled={userRole !== 'OWNER'}
-              className={`w-full flex items-center justify-center gap-1.5 py-2.5 px-3 border rounded-xl text-xs font-bold transition duration-155 ${
-                userRole === 'OWNER'
-                  ? 'bg-slate-50 hover:bg-rose-50 hover:text-rose-600 border-slate-200 hover:border-rose-100 text-slate-600 cursor-pointer'
-                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
-              }`}
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Reset ke Data Simulasi {userRole !== 'OWNER' && '🔒'}
-            </button>
-            <div className="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1">
-              <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
-              Data tersimpan otomatis di browser
+              <button
+                id="sidebar-btn-seed-simulation"
+                onClick={userRole === 'OWNER' ? handleResetToPresets : undefined}
+                disabled={userRole !== 'OWNER'}
+                className={`w-full flex items-center justify-center gap-1.5 py-2.5 px-3 border rounded-xl text-xs font-bold transition duration-155 ${
+                  userRole === 'OWNER'
+                    ? 'bg-slate-50 hover:bg-rose-50 hover:text-rose-600 border-slate-200 hover:border-rose-100 text-slate-600 cursor-pointer'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset ke Data Simulasi {userRole !== 'OWNER' && '🔒'}
+              </button>
+              <div className="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1">
+                <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                Data tersimpan otomatis di browser
+              </div>
             </div>
-          </div>
+          )}
         </aside>
 
         {/* Outer Workspace Shell Panel */}

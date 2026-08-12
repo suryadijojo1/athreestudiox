@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Invoice, PaymentTransaction } from '../types';
 import { Printer, X, CreditCard, AlertCircle, Phone, MapPin, Eye, Settings, HelpCircle, Columns, ChevronDown, ChevronUp, Check, Shield, Calendar } from 'lucide-react';
 import LogoRenderer from './LogoRenderer';
+import JobSpecCard from './JobSpecCard';
 
 interface NotaDetailModalProps {
   invoice: Invoice | null;
@@ -724,13 +725,11 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/80 print:bg-white print:border-slate-300">
-                  <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                    MAKLUMAT SPESIFIKASI / CATATAN
+                <div className="space-y-2">
+                  <span className="text-[10px] uppercase font-black text-indigo-600 tracking-wider block px-1">
+                    📋 SPK & SPESIFIKASI PEKERJAAN
                   </span>
-                  <p className="text-slate-600 mt-1 print:text-slate-800 italic font-semibold leading-relaxed">
-                    {invoice.notes || "Tidak ada catatan spesifikasi tambahan untuk pesanan ini."}
-                  </p>
+                  <JobSpecCard invoice={invoice} showStatusDropdown={false} className="border-indigo-150 shadow-xs" />
                 </div>
               </div>
 

@@ -8,6 +8,7 @@ import { Product, Invoice, AuditLog, CashierSession, PaymentTransaction } from '
 import LaporanSalesCategoryModal from './LaporanSalesCategoryModal';
 import { TrendingUp, Wallet, Landmark, AlertTriangle, ArrowUpRight, ArrowDownRight, Package, Lock, Calendar, Clock, Printer, X, AlertCircle, Download, Database, ChevronDown, ChevronUp, Check, Settings, RefreshCw, Layers, CheckCircle2, Activity, Edit, Trash2, Coins, RotateCcw, Users, BookOpen, FileSpreadsheet } from 'lucide-react';
 import { motion } from 'motion/react';
+import JobSpecCard from './JobSpecCard';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -1899,94 +1900,96 @@ export default function Dashboard({
       {/* Two Columns Dashboard Content */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 print:hidden">
         
-        {/* Left Column: Recent Notes (3 columns wide) */}
-        <div className="lg:col-span-3 space-y-4" id="recent-notes-column">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Daftar Nota Penjualan Terbaru</h2>
-            <button 
-              id="view-all-notes"
-              onClick={() => setActiveTab('daftar-nota')}
-              className="text-xs font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-wider transition-colors flex items-center gap-1 hover:underline"
-            >
-              Lihat Semua
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        {/* Left Column: Recent Notes (3 columns wide) - Hidden for PRODUKSI */}
+        {userRole !== 'PRODUKSI' && (
+          <div className="lg:col-span-3 space-y-4" id="recent-notes-column">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Daftar Nota Penjualan Terbaru</h2>
+              <button 
+                id="view-all-notes"
+                onClick={() => setActiveTab('daftar-nota')}
+                className="text-xs font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-wider transition-colors flex items-center gap-1 hover:underline"
+              >
+                Lihat Semua
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
-          <div className="bg-white border-2 border-indigo-100 rounded-3xl overflow-hidden shadow-md" id="table-recent-notes">
-            <div className="overflow-x-auto min-h-[220px]">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="border-b-2 border-indigo-100 text-xs font-black uppercase tracking-wider text-indigo-700 bg-indigo-50/50">
-                    <th className="px-5 py-4">No. Nota</th>
-                    <th className="px-5 py-4">Pemesanan / Tim</th>
-                    <th className="px-5 py-4 text-right">Total Tagihan</th>
-                    <th className="px-5 py-4 text-center">Status</th>
-                    <th className="px-5 py-4 text-center">Produksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-indigo-50">
-                  {recentInvoices.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-5 py-12 text-center text-slate-400 font-bold">
-                        Belum ada data nota transaksi.
-                      </td>
+            <div className="bg-white border-2 border-indigo-100 rounded-3xl overflow-hidden shadow-md" id="table-recent-notes">
+              <div className="overflow-x-auto min-h-[220px]">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-indigo-100 text-xs font-black uppercase tracking-wider text-indigo-700 bg-indigo-50/50">
+                      <th className="px-5 py-4">No. Nota</th>
+                      <th className="px-5 py-4">Pemesanan / Tim</th>
+                      <th className="px-5 py-4 text-right">Total Tagihan</th>
+                      <th className="px-5 py-4 text-center">Status</th>
+                      <th className="px-5 py-4 text-center">Produksi</th>
                     </tr>
-                  ) : (
-                    recentInvoices.map((inv) => (
-                      <tr 
-                        key={inv.id} 
-                        className="hover:bg-indigo-50/20 transition-colors cursor-pointer"
-                        onClick={() => setActiveTab('daftar-nota')}
-                      >
-                        <td className="px-5 py-4.5 font-mono text-indigo-600 font-black">
-                          {inv.invoiceNum}
-                        </td>
-                        <td className="px-5 py-4.5">
-                          <div className="font-bold text-slate-800">{inv.customerName}</div>
-                          <div className="text-[11px] text-slate-400 font-bold">{new Date(inv.date).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}</div>
-                        </td>
-                        <td className="px-5 py-4.5 text-right font-black text-slate-800">
-                          {formatRp(inv.totalAmount)}
-                        </td>
-                        <td className="px-5 py-4.5 text-center">
-                          <span className={`inline-block px-3 py-1 text-xs font-black rounded-full ${
-                            inv.status === 'LUNAS' 
-                              ? 'bg-green-100 text-green-700' 
-                              : inv.status === 'DP' 
-                              ? 'bg-indigo-100 text-indigo-700'
-                              : 'bg-rose-100 text-rose-700'
-                          }`}>
-                            {inv.customStatusLabel || inv.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4.5 text-center whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-black rounded-full ${
-                            (inv.productionStatus || 'ANTREAN') === 'ANTREAN'
-                              ? 'bg-slate-100 text-slate-705'
-                              : (inv.productionStatus || 'ANTREAN') === 'DESAIN'
-                              ? 'bg-amber-100 text-amber-700'
-                              : (inv.productionStatus || 'ANTREAN') === 'PROSES'
-                              ? 'bg-indigo-100 text-indigo-700'
-                              : (inv.productionStatus || 'ANTREAN') === 'SELESAI'
-                              ? 'bg-teal-100 text-teal-700'
-                              : 'bg-green-150/80 text-green-700'
-                          }`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                            {(inv.productionStatus || 'ANTREAN')}
-                          </span>
+                  </thead>
+                  <tbody className="divide-y divide-indigo-50">
+                    {recentInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-5 py-12 text-center text-slate-400 font-bold">
+                          Belum ada data nota transaksi.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      recentInvoices.map((inv) => (
+                        <tr 
+                          key={inv.id} 
+                          className="hover:bg-indigo-50/20 transition-colors cursor-pointer"
+                          onClick={() => setActiveTab('daftar-nota')}
+                        >
+                          <td className="px-5 py-4.5 font-mono text-indigo-600 font-black">
+                            {inv.invoiceNum}
+                          </td>
+                          <td className="px-5 py-4.5">
+                            <div className="font-bold text-slate-800">{inv.customerName}</div>
+                            <div className="text-[11px] text-slate-400 font-bold">{new Date(inv.date).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}</div>
+                          </td>
+                          <td className="px-5 py-4.5 text-right font-black text-slate-800">
+                            {formatRp(inv.totalAmount)}
+                          </td>
+                          <td className="px-5 py-4.5 text-center">
+                            <span className={`inline-block px-3 py-1 text-xs font-black rounded-full ${
+                              inv.status === 'LUNAS' 
+                                ? 'bg-green-100 text-green-700' 
+                                : inv.status === 'DP' 
+                                ? 'bg-indigo-100 text-indigo-700'
+                                : 'bg-rose-100 text-rose-700'
+                            }`}>
+                              {inv.customStatusLabel || inv.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4.5 text-center whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-black rounded-full ${
+                              (inv.productionStatus || 'ANTREAN') === 'ANTREAN'
+                                ? 'bg-slate-100 text-slate-705'
+                                : (inv.productionStatus || 'ANTREAN') === 'DESAIN'
+                                ? 'bg-amber-100 text-amber-700'
+                                : (inv.productionStatus || 'ANTREAN') === 'PROSES'
+                                ? 'bg-indigo-100 text-indigo-700'
+                                : (inv.productionStatus || 'ANTREAN') === 'SELESAI'
+                                ? 'bg-teal-100 text-teal-700'
+                                : 'bg-green-150/80 text-green-700'
+                            }`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                              {(inv.productionStatus || 'ANTREAN')}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Right Column: Key/Quick Production Deadlines (2 columns wide) */}
-        <div className="lg:col-span-2 space-y-4" id="quick-deadline-column">
+        {/* Right Column: Key/Quick Production Deadlines (Full width for PRODUKSI, else 2 cols) */}
+        <div className={`${userRole === 'PRODUKSI' ? 'lg:col-span-5' : 'lg:col-span-2'} space-y-4`} id="quick-deadline-column">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
               <Clock className="w-5 h-5 text-indigo-500" />
@@ -2011,70 +2014,15 @@ export default function Dashboard({
                 <p className="text-xs text-slate-400 mt-1">Tidak ada pekerjaan produksi aktif yang melewati batas tenggat hari ini.</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {urgentDeadlines.slice(0, 4).map((inv) => {
-                  const today = new Date();
-                  today.setHours(0,0,0,0);
-                  const deadline = new Date(inv.deadlineDate!);
-                  deadline.setHours(0,0,0,0);
-                  const diffTime = deadline.getTime() - today.getTime();
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                  const isOverdue = diffDays < 0;
-                  const isToday = diffDays === 0;
-
-                  return (
-                    <div 
-                      key={inv.id} 
-                      className={`p-4 border rounded-2xl transition-all duration-205 flex items-center justify-between gap-3 cursor-pointer ${
-                        isOverdue 
-                          ? 'bg-rose-50/60 hover:bg-rose-50 border-rose-200 shadow-sm' 
-                          : isToday
-                          ? 'bg-amber-50/60 hover:bg-amber-100 border-amber-200'
-                          : 'bg-indigo-50/30 hover:bg-indigo-50/60 border-indigo-50/50'
-                      }`}
-                      onClick={() => setActiveTab('daftar-nota')}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs text-indigo-600 font-extrabold">{inv.invoiceNum}</span>
-                          <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded-md ${
-                            (inv.productionStatus || 'ANTREAN') === 'ANTREAN'
-                              ? 'bg-slate-100 text-slate-700'
-                              : (inv.productionStatus || 'ANTREAN') === 'DESAIN'
-                              ? 'bg-amber-100 text-amber-700'
-                              : (inv.productionStatus || 'ANTREAN') === 'PROSES'
-                              ? 'bg-indigo-100 text-indigo-700'
-                              : 'bg-teal-100 text-teal-700'
-                          }`}>
-                            {(inv.productionStatus || 'ANTREAN')}
-                          </span>
-                        </div>
-                        <p className="text-sm font-bold text-slate-800 truncate mt-1">{inv.customerName}</p>
-                        <p className="text-xs text-slate-500 font-semibold truncate mt-0.5">{inv.notes || 'Pemesanan Jersey'}</p>
-                      </div>
-
-                      <div className="text-right flex-shrink-0">
-                        <span className={`inline-block px-2.5 py-1 text-[11px] font-black rounded-full uppercase tracking-wider ${
-                          isOverdue 
-                            ? 'bg-rose-100 text-rose-700 border border-rose-200 animate-pulse' 
-                            : isToday
-                            ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                            : 'bg-indigo-100 text-indigo-700'
-                        }`}>
-                          {isOverdue 
-                            ? `Overdue ${Math.abs(diffDays)} H` 
-                            : isToday
-                            ? 'Hari Ini'
-                            : `${diffDays} Hari Lagi`
-                          }
-                        </span>
-                        <div className="text-[10px] text-slate-400 font-bold mt-1">
-                          {new Date(inv.deadlineDate!).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="space-y-4">
+                {urgentDeadlines.slice(0, 4).map((inv) => (
+                  <JobSpecCard
+                    key={inv.id}
+                    invoice={inv}
+                    onSelect={() => setActiveTab('daftar-nota')}
+                    showStatusDropdown={false}
+                  />
+                ))}
                 {urgentDeadlines.length > 4 && (
                   <div className="text-center pt-2">
                     <span 
