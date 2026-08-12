@@ -2468,13 +2468,17 @@ export default function Dashboard({
                                     </td>
                                     <td className="px-4 py-3.5 text-center">
                                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                                        inv.productionStatus === 'SELESAI' || inv.productionStatus === 'SIAP_DIAMBIL' || inv.productionStatus === 'SUDAH_DIAMBIL'
+                                        (inv.productionStatus === 'SUDAH_DIAMBIL' || inv.productionStatus === 'SIAP_DIAMBIL') && inv.remainingDebt > 0
+                                          ? 'bg-rose-600 text-white animate-pulse shadow-xs border border-rose-700'
+                                          : inv.productionStatus === 'SELESAI' || inv.productionStatus === 'SIAP_DIAMBIL' || inv.productionStatus === 'SUDAH_DIAMBIL'
                                           ? 'bg-emerald-55/65 text-emerald-700'
                                           : inv.productionStatus === 'ANTREAN'
                                           ? 'bg-slate-100 text-slate-500'
                                           : 'bg-indigo-50 text-indigo-600 border border-indigo-100/40'
                                       }`}>
-                                        {inv.productionStatus || 'ANTREAN'}
+                                        {(inv.productionStatus === 'SUDAH_DIAMBIL' || inv.productionStatus === 'SIAP_DIAMBIL') && inv.remainingDebt > 0
+                                          ? '🔴 DIAMBIL (PIUTANG)'
+                                          : (inv.productionStatus || 'ANTREAN')}
                                       </span>
                                     </td>
                                   </tr>
@@ -2702,7 +2706,14 @@ export default function Dashboard({
                         .map((inv) => (
                           <tr key={inv.id}>
                             <td className="p-2 font-bold text-indigo-700 border-r border-slate-200">{inv.invoiceNum}</td>
-                            <td className="p-2 font-sans font-bold text-slate-800 border-r border-slate-200">{inv.customerName}</td>
+                            <td className="p-2 font-sans font-bold text-slate-800 border-r border-slate-200">
+                              {inv.customerName}
+                              {(inv.productionStatus === 'SUDAH_DIAMBIL' || inv.productionStatus === 'SIAP_DIAMBIL') && (
+                                <span className="ml-1.5 inline-flex items-center gap-0.5 bg-rose-600 text-white font-black text-[9px] px-1.5 py-0.5 rounded-md animate-pulse border border-rose-700">
+                                  🔴 DIAMBIL (BELUM LUNAS)
+                                </span>
+                              )}
+                            </td>
                             <td className="p-2 text-center border-r border-slate-200">{new Date(inv.date).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}</td>
                             <td className="p-2 text-right border-r border-slate-200">{formatRp(inv.totalAmount)}</td>
                             <td className="p-2 text-right border-r border-slate-200">{formatRp(inv.downPayment + inv.settlement)}</td>

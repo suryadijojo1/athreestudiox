@@ -21,7 +21,7 @@ interface NotaListProps {
 
 export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, onUpdateProductionStatus, onEditInvoice, onQuickPrint, onDeleteInvoice, userRole = 'OWNER' }: NotaListProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'SEMAU' | 'LUNAS' | 'DP' | 'BELUM_BAYAR'>('SEMAU');
+  const [statusFilter, setStatusFilter] = useState<'SEMAU' | 'LUNAS' | 'DP' | 'BELUM_BAYAR' | 'PIUTANG'>('SEMAU');
   const [productionFilter, setProductionFilter] = useState<'SEMAU' | 'AKTIF_PRODUKSI' | 'ANTREAN' | 'DESAIN' | 'PROSES' | 'SELESAI' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL'>(
     userRole === 'PRODUKSI' ? 'AKTIF_PRODUKSI' : 'SEMAU'
   );
@@ -219,8 +219,24 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     return null;
   };
 
-  const getRowBgClass = (deadlineDateStr: string | undefined, productionStatus: string | undefined) => {
-    const dlStatus = getDeadlineStatus(deadlineDateStr, productionStatus);
+  const [filterOnlyTakenWithDebt, setFilterOnlyTakenWithDebt] = useState(false);
+
+  // Count taken with debt
+  const takenWithDebtCount = React.useMemo(() => {
+    return invoices.filter(inv => (inv.productionStatus === 'SUDAH_DIAMBIL' || inv.productionStatus === 'SIAP_DIAMBIL') && inv.remainingDebt > 0).length;
+  }, [invoices]);
+
+  // Total count of invoices with remaining debt
+  const piutangCount = React.useMemo(() => {
+    return invoices.filter(inv => inv.remainingDebt > 0).length;
+  }, [invoices]);
+
+  const getRowBgClass = (inv: Invoice) => {
+    const isTakenWithDebt = (inv.productionStatus === 'SUDAH_DIAMBIL' || inv.productionStatus === 'SIAP_DIAMBIL') && inv.remainingDebt > 0;
+    if (isTakenWithDebt) {
+      return "bg-rose-100/90 hover:bg-rose-200/90 border-l-4 border-l-rose-600 border-b-2 border-rose-300 text-rose-950 font-bold shadow-xs";
+    }
+    const dlStatus = getDeadlineStatus(inv.deadlineDate, inv.productionStatus);
     if (dlStatus === 'overdue') {
       return "bg-rose-50/65 hover:bg-rose-100 border-b border-rose-100/85 text-rose-950 font-semibold";
     }
@@ -242,6 +258,12 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
 
   // Filter logic
   const filteredInvoices = invoices.filter((inv) => {
+    // If filterOnlyTakenWithDebt is active
+    if (filterOnlyTakenWithDebt) {
+      const isTakenWithDebt = (inv.productionStatus === 'SUDAH_DIAMBIL' || inv.productionStatus === 'SIAP_DIAMBIL') && inv.remainingDebt > 0;
+      if (!isTakenWithDebt) return false;
+    }
+
     const matchesSearch = 
       inv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       inv.invoiceNum.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -256,7 +278,11 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
     if (!matchesDateRange) return false;
     
     // Check status filter
-    if (statusFilter !== 'SEMAU' && inv.status !== statusFilter) return false;
+    if (statusFilter === 'PIUTANG') {
+      if (inv.remainingDebt <= 0) return false;
+    } else if (statusFilter !== 'SEMAU' && inv.status !== statusFilter) {
+      return false;
+    }
 
     // Check production status filter
     if (productionFilter === 'AKTIF_PRODUKSI') {
@@ -327,6 +353,32 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
         </div>
       )}
       
+      {/* Banner Peringatan Red Shape jika ada Nota DIAMBIL tapi belum Lunas */}
+      {takenWithDebtCount > 0 && (
+        <div className="bg-gradient-to-r from-rose-600 to-red-700 text-white p-3.5 rounded-2xl shadow-md border-2 border-rose-500 flex flex-wrap items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-white/20 p-2 rounded-xl shrink-0">
+              <AlertTriangle className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <span className="font-black text-xs md:text-sm uppercase tracking-wider block">
+                🔴 TANDA MERAH (PERHATIAN): {takenWithDebtCount} NOTA SUDAH DIAMBIL TAPI MASIH MEMILIKI SISA PIUTANG!
+              </span>
+              <span className="text-[11px] text-rose-100 font-medium">
+                Barang pesanan telah diserahkan/diambil pelanggan namun pembayaran belum lunas. Mohon konfirmasi pelunasan!
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFilterOnlyTakenWithDebt(!filterOnlyTakenWithDebt)}
+            className="bg-white text-rose-700 hover:bg-rose-50 font-black px-3.5 py-1.5 rounded-xl text-xs shadow-sm transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+          >
+            {filterOnlyTakenWithDebt ? '✨ Tampilkan Semua Nota' : '🔴 Filter Nota Merah (Sisa Piutang)'}
+          </button>
+        </div>
+      )}
+
       {/* Search & Filter Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
         <div>
@@ -435,6 +487,26 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
               }`}
             >
               DP Active
+            </button>
+            <button
+              id="filter-piutang-btn"
+              onClick={() => setStatusFilter('PIUTANG')}
+              className={`px-3 py-1 text-xs font-extrabold rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                statusFilter === 'PIUTANG' 
+                  ? 'bg-rose-600 text-white shadow-sm font-black' 
+                  : 'text-rose-600 hover:bg-rose-50 font-bold border border-rose-200/80 bg-rose-50/50'
+              }`}
+              title="Tampilkan semua nota yang masih memiliki sisa piutang"
+            >
+              <span className={`w-2 h-2 rounded-full ${statusFilter === 'PIUTANG' ? 'bg-amber-300 animate-ping' : 'bg-rose-500 animate-pulse'} shrink-0 inline-block`} />
+              Sisa Piutang
+              {piutangCount > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                  statusFilter === 'PIUTANG' ? 'bg-rose-800 text-white' : 'bg-rose-100 text-rose-700'
+                }`}>
+                  {piutangCount}
+                </span>
+              )}
             </button>
           </div>
 
@@ -548,7 +620,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                 filteredInvoices.map((inv, idx) => (
                   <tr 
                     key={inv.id}
-                    className={`${getRowBgClass(inv.deadlineDate, inv.productionStatus)} transition-colors group cursor-pointer`}
+                    className={`${getRowBgClass(inv)} transition-colors group cursor-pointer`}
                     onClick={() => onSelectInvoice(inv)}
                   >
                     {/* Index */}
@@ -611,7 +683,13 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                     {/* Sisa Piutang */}
                     <td className="px-2 py-2 lg:px-2.5 lg:py-2.5 text-right font-mono font-black">
                       {inv.remainingDebt > 0 ? (
-                        <span className="text-amber-600">{formatRp(inv.remainingDebt)}</span>
+                        (inv.productionStatus === 'SUDAH_DIAMBIL' || inv.productionStatus === 'SIAP_DIAMBIL') ? (
+                          <span className="bg-rose-600 text-white font-black px-2 py-0.5 rounded-lg text-xs shadow-sm animate-pulse inline-block border border-rose-700">
+                            {formatRp(inv.remainingDebt)}
+                          </span>
+                        ) : (
+                          <span className="text-amber-600">{formatRp(inv.remainingDebt)}</span>
+                        )
                       ) : (
                         <span className="text-slate-400 font-medium font-sans">Rp 0</span>
                       )}
@@ -676,6 +754,14 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
                           </>
                         )}
                       </select>
+                      {(inv.productionStatus === 'SUDAH_DIAMBIL' || inv.productionStatus === 'SIAP_DIAMBIL') && inv.remainingDebt > 0 && (
+                        <div className="mt-1 flex justify-center">
+                          <span className="inline-flex items-center gap-1 bg-rose-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-xs animate-pulse tracking-wider uppercase border border-rose-700" title="Barang sudah diambil/siap tapi sisa piutang belum lunas!">
+                            <AlertTriangle className="w-2.5 h-2.5 text-amber-300 fill-amber-300 shrink-0" />
+                            🔴 DIAMBIL (PIUTANG)
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Actions */}

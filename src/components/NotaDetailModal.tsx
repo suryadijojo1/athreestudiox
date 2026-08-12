@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Invoice, PaymentTransaction } from '../types';
-import { Printer, X, CreditCard, AlertCircle, Phone, MapPin, Eye, Settings, HelpCircle, Columns, ChevronDown, ChevronUp, Check, Shield, Calendar } from 'lucide-react';
+import { Printer, X, CreditCard, AlertCircle, Phone, MapPin, Eye, Settings, HelpCircle, Columns, ChevronDown, ChevronUp, Check, Shield, Calendar, AlertTriangle } from 'lucide-react';
 import LogoRenderer from './LogoRenderer';
 import JobSpecCard from './JobSpecCard';
 
@@ -649,6 +649,26 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
                   </div>
                 </div>
               </div>
+
+              {/* Banner Peringatan Red Shape jika Barang DIAMBIL tapi Belum Lunas */}
+              {(invoice.productionStatus === 'SUDAH_DIAMBIL' || invoice.productionStatus === 'SIAP_DIAMBIL') && invoice.remainingDebt > 0 && (
+                <div className="mb-4 bg-gradient-to-r from-rose-600 to-red-700 text-white p-4 rounded-2xl shadow-lg border-2 border-rose-500 animate-pulse flex items-center justify-between gap-3 print:hidden">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/20 p-2 rounded-xl shrink-0">
+                      <AlertTriangle className="w-6 h-6 text-amber-300" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm uppercase tracking-wider text-white">
+                        🔴 TANDA MERAH: BARANG SUDAH DIAMBIL — BELUM LUNAS!
+                      </h4>
+                      <p className="text-xs text-rose-100 font-semibold mt-0.5">
+                        Barang pesanan telah diserahkan/diambil, tetapi pelanggan masih memiliki sisa piutang sebesar{' '}
+                        <strong className="text-amber-300 font-mono text-sm underline decoration-2">{formatRp(invoice.remainingDebt)}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Customer & Spec Details */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-sans print:grid-cols-3">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Invoice } from '../types';
-import { Clock, Scissors, Tag, Layers, Shirt, Flame } from 'lucide-react';
+import { Clock, Scissors, Tag, Layers, Shirt, Flame, AlertTriangle } from 'lucide-react';
 
 export interface JobSpecification {
   jenisProduksi: string;
@@ -152,11 +152,38 @@ export default function JobSpecCard({
     }
   };
 
+  const isTakenWithDebt = (invoice.productionStatus === 'SUDAH_DIAMBIL' || invoice.productionStatus === 'SIAP_DIAMBIL') && invoice.remainingDebt > 0;
+
+  const formatRp = (value: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
   return (
     <div
       onClick={() => onSelect?.(invoice)}
-      className={`bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:border-indigo-400 dark:hover:border-indigo-600 transition-all duration-200 cursor-pointer space-y-4 group relative overflow-hidden ${className}`}
+      className={`bg-white dark:bg-slate-900 border-2 ${
+        isTakenWithDebt 
+          ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-950/20' 
+          : 'border-slate-200 dark:border-slate-800'
+      } rounded-3xl p-5 shadow-sm hover:border-indigo-400 dark:hover:border-indigo-600 transition-all duration-200 cursor-pointer space-y-4 group relative overflow-hidden ${className}`}
     >
+      {/* Banner Merah untuk Barang DIAMBIL tapi Belum Lunas */}
+      {isTakenWithDebt && (
+        <div className="bg-rose-600 text-white rounded-2xl px-3 py-1.5 flex items-center justify-between gap-2 shadow-md animate-pulse">
+          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            🔴 DIAMBIL (BELUM LUNAS)
+          </span>
+          <span className="font-mono font-black text-xs text-amber-200 bg-rose-800/80 px-2 py-0.5 rounded-lg border border-rose-500">
+            Sisa: {formatRp(invoice.remainingDebt)}
+          </span>
+        </div>
+      )}
       {/* Top Header: Invoice No, Pemesan, Status Dropdown */}
       <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
         <div className="min-w-0 flex-1">
