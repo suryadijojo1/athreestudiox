@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Product, StockMovement } from '../types';
+import { Product, StockMovement, PRODUCT_CATEGORIES, normalizeCategory } from '../types';
 import { 
   Search, 
   Plus, 
@@ -76,7 +76,7 @@ export default function StokPanel({
   // New product form states
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState<string>('JERSEY');
   const [sellPrice, setSellPrice] = useState<number>(0);
   const [buyPrice, setBuyPrice] = useState<number>(0);
   const [initialStock, setInitialStock] = useState<number>(0);
@@ -100,12 +100,12 @@ export default function StokPanel({
   };
 
   // Distinct categories list
-  const categories = ['SEMUA', ...Array.from(new Set(products.map(p => p.category)))];
+  const categories = ['SEMUA', ...PRODUCT_CATEGORIES];
 
   // Filtering products
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'SEMUA' || p.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'SEMUA' || normalizeCategory(p.category) === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -118,7 +118,8 @@ export default function StokPanel({
   // New product submissions
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sku.trim() || !name.trim() || !category.trim()) return;
+    const finalCategory = normalizeCategory(category);
+    if (!sku.trim() || !name.trim() || !finalCategory) return;
 
     const finalStock = hasInitialStock ? initialStock : 0;
     const newProductId = `prod-${Date.now()}`;
@@ -126,7 +127,7 @@ export default function StokPanel({
       id: newProductId,
       sku: sku.trim().toUpperCase(),
       name: name.trim(),
-      category: category.trim(),
+      category: finalCategory,
       sellPrice,
       buyPrice,
       stock: finalStock,
@@ -303,7 +304,8 @@ export default function StokPanel({
           
           if (!name.trim()) return;
 
-          const category = (headerIndexMap['category'] !== undefined ? row[headerIndexMap['category']] : '') || 'Umum';
+          const categoryRaw = (headerIndexMap['category'] !== undefined ? row[headerIndexMap['category']] : '') || 'DLL';
+          const category = normalizeCategory(categoryRaw);
           
           const rawSellPrice = headerIndexMap['sellPrice'] !== undefined ? row[headerIndexMap['sellPrice']] : '0';
           const sellPrice = parseFloat(rawSellPrice.replace(/[^0-9.-]+/g, '')) || 0;
@@ -323,7 +325,7 @@ export default function StokPanel({
             id: `temp-${Date.now()}-${rIdx}`,
             sku,
             name: name.trim(),
-            category: category.trim(),
+            category: normalizeCategory(category),
             sellPrice,
             buyPrice,
             stock,
@@ -364,7 +366,7 @@ export default function StokPanel({
     setEditingProductId(p.id);
     setSku(p.sku);
     setName(p.name);
-    setCategory(p.category);
+    setCategory(normalizeCategory(p.category));
     setSellPrice(p.sellPrice);
     setBuyPrice(p.buyPrice);
     setMinStock(p.minStock);
@@ -379,7 +381,7 @@ export default function StokPanel({
       ...target,
       sku: sku.trim().toUpperCase() || target.sku,
       name: name.trim() || target.name,
-      category: category.trim() || target.category,
+      category: normalizeCategory(category || target.category),
       sellPrice: sellPrice >= 0 ? sellPrice : target.sellPrice,
       buyPrice: buyPrice >= 0 ? buyPrice : target.buyPrice,
       minStock: minStock >= 0 ? minStock : target.minStock,
@@ -757,15 +759,20 @@ export default function StokPanel({
                       {/* Category */}
                       <td className="px-5 py-4">
                         {isEditing ? (
-                          <input
-                            type="text"
-                            value={category}
+                          <select
+                            value={normalizeCategory(category)}
                             onChange={(e) => setCategory(e.target.value)}
-                            className="bg-white border-2 border-indigo-100 px-3 py-1.5 text-xs rounded-xl text-slate-800 w-full outline-none focus:border-indigo-500"
-                          />
+                            className="bg-white border-2 border-indigo-100 px-3 py-1.5 text-xs rounded-xl text-slate-800 font-bold w-full outline-none focus:border-indigo-500 cursor-pointer"
+                          >
+                            {PRODUCT_CATEGORIES.map((cat) => (
+                              <option key={cat} value={cat}>
+                                {cat}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
                           <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-0.5 rounded-lg font-bold">
-                            {p.category}
+                            {normalizeCategory(p.category)}
                           </span>
                         )}
                       </td>
@@ -956,15 +963,19 @@ export default function StokPanel({
                 <label className="block text-xs font-bold text-slate-500 mb-1" htmlFor="add-category">
                   Kategori Utama <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   id="add-category"
                   required
-                  placeholder="Contoh: Jersey / Aksesoris"
-                  value={category}
+                  value={normalizeCategory(category)}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 border-2 border-indigo-50 rounded-2xl text-slate-800 font-semibold outline-none focus:border-indigo-500"
-                />
+                  className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 border-2 border-indigo-50 rounded-2xl text-slate-800 font-bold outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  {PRODUCT_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

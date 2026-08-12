@@ -418,10 +418,10 @@ export default function NotaForm({ products, onSave, nextInvoiceNum, invoiceToEd
                     type="text"
                     id="input-customer-name"
                     required
-                    placeholder="Contoh: Garuda FC (Budi)"
+                    placeholder="Contoh: GARUDA FC (BUDI)"
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 hover:bg-indigo-50/20 focus:bg-white border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none focus:ring-0 rounded-2xl text-slate-800 placeholder-slate-400 outline-none transition duration-150 animate-all"
+                    onChange={(e) => setCustomerName(e.target.value.toUpperCase())}
+                    className="w-full px-4 py-2.5 text-sm bg-indigo-50/10 hover:bg-indigo-50/20 focus:bg-white border-2 border-indigo-50 focus:border-indigo-500 focus:outline-none focus:ring-0 rounded-2xl text-slate-800 placeholder-slate-400 outline-none transition duration-150 animate-all uppercase font-semibold"
                   />
                 </div>
               </div>

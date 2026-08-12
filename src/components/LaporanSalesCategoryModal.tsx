@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Invoice, Product, InvoiceItem } from '../types';
+import { Invoice, Product, InvoiceItem, PRODUCT_CATEGORIES, normalizeCategory } from '../types';
 import { X, Printer, Download, Filter, FileSpreadsheet, Layers, Users, Package, Award } from 'lucide-react';
 
 interface LaporanSalesCategoryModalProps {
@@ -25,22 +25,22 @@ export default function LaporanSalesCategoryModal({
 
   // Helper to map an item to its product category
   const getItemCategory = (item: InvoiceItem): string => {
-    if (!item) return 'Umum';
+    if (!item) return 'DLL';
     if (products && products.length > 0) {
       const prod = products.find(p => p.id === item.productId || (p.sku && p.sku.toLowerCase() === item.productId.toLowerCase()));
-      if (prod && prod.category) return prod.category.trim();
+      if (prod && prod.category) return normalizeCategory(prod.category);
 
       const prodByName = products.find(p => p.name.toLowerCase() === item.productName.toLowerCase());
-      if (prodByName && prodByName.category) return prodByName.category.trim();
+      if (prodByName && prodByName.category) return normalizeCategory(prodByName.category);
     }
-    return 'Umum / Lainnya';
+    return 'DLL';
   };
 
   // Get all unique categories present in products list and invoices
   const availableCategories = useMemo(() => {
-    const setCat = new Set<string>();
+    const setCat = new Set<string>(PRODUCT_CATEGORIES);
     products.forEach(p => {
-      if (p.category && p.category.trim()) setCat.add(p.category.trim());
+      if (p.category && p.category.trim()) setCat.add(normalizeCategory(p.category));
     });
     invoices.forEach(inv => {
       inv.items.forEach(item => {

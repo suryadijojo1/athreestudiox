@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession, ShopSettings } from './types';
+import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession, ShopSettings, normalizeCategory } from './types';
 import { motion } from 'motion/react';
 import { INITIAL_PRODUCTS, INITIAL_INVOICES, INITIAL_MOVEMENTS, INITIAL_AUDIT_LOGS } from './initialData';
 import { doc, getDocFromServer, onSnapshot, collection } from 'firebase/firestore';
@@ -447,7 +447,8 @@ export default function App() {
         const storedMovements = localStorage.getItem('nota_stok_movements');
         const storedAuditLogs = localStorage.getItem('nota_stok_audit_logs');
 
-        const fallbackProds = storedProducts ? JSON.parse(storedProducts) : INITIAL_PRODUCTS;
+        const rawFallbackProds = storedProducts ? JSON.parse(storedProducts) : INITIAL_PRODUCTS;
+        const fallbackProds = rawFallbackProds.map((p: Product) => ({ ...p, category: normalizeCategory(p.category) }));
         const fallbackInvs = storedInvoices ? JSON.parse(storedInvoices) : INITIAL_INVOICES;
         const fallbackMoves = storedMovements ? JSON.parse(storedMovements) : INITIAL_MOVEMENTS;
         const fallbackLogs = storedAuditLogs ? JSON.parse(storedAuditLogs) : INITIAL_AUDIT_LOGS;
@@ -534,7 +535,8 @@ export default function App() {
 
         if (dbProducts.length > 0 || dbInvoices.length > 0) {
           console.log("Memuat data dari Cloud Firebase...");
-          setProducts(dbProducts);
+          const normalizedDbProducts = dbProducts.map(p => ({ ...p, category: normalizeCategory(p.category) }));
+          setProducts(normalizedDbProducts);
           setInvoices(dbInvoices);
           setMovements(dbMovements);
           setAuditLogs(dbAuditLogs);
@@ -763,7 +765,8 @@ export default function App() {
         const storedMovements = localStorage.getItem('nota_stok_movements');
         const storedAuditLogs = localStorage.getItem('nota_stok_audit_logs');
 
-        const fallbackProds = storedProducts ? JSON.parse(storedProducts) : INITIAL_PRODUCTS;
+        const rawFallbackProds = storedProducts ? JSON.parse(storedProducts) : INITIAL_PRODUCTS;
+        const fallbackProds = rawFallbackProds.map((p: Product) => ({ ...p, category: normalizeCategory(p.category) }));
         const fallbackInvs = storedInvoices ? JSON.parse(storedInvoices) : INITIAL_INVOICES;
         const fallbackMoves = storedMovements ? JSON.parse(storedMovements) : INITIAL_MOVEMENTS;
         const fallbackLogs = storedAuditLogs ? JSON.parse(storedAuditLogs) : INITIAL_AUDIT_LOGS;

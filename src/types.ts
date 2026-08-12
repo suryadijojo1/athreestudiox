@@ -3,6 +3,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export const PRODUCT_CATEGORIES = ['JERSEY', 'SABLON', 'BAJU', 'DLL'] as const;
+export type ProductCategory = typeof PRODUCT_CATEGORIES[number];
+
+export const normalizeCategory = (cat?: string): string => {
+  if (!cat) return 'DLL';
+  const trimmed = cat.trim();
+  const upper = trimmed.toUpperCase();
+  if (
+    upper === 'PAKAIAN' || 
+    upper === 'PAKAIAN & PAKAIAN' || 
+    upper === 'CELANA' || 
+    upper === 'KAOS' || 
+    upper === 'BAJU'
+  ) {
+    return 'BAJU';
+  }
+  if (upper === 'JERSEY') return 'JERSEY';
+  if (upper === 'SABLON') return 'SABLON';
+  if (
+    upper === 'DLL' || 
+    upper === 'PERALATAN' || 
+    upper === 'AKSESORIS' || 
+    upper === 'UMUM' || 
+    upper === 'LAINNYA' || 
+    upper === 'LAIN-LAIN'
+  ) {
+    return 'DLL';
+  }
+  if ((PRODUCT_CATEGORIES as readonly string[]).includes(upper)) return upper;
+  return upper;
+};
+
 export interface Product {
   id: string;
   sku: string;

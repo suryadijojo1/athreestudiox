@@ -1549,8 +1549,8 @@ export default function KasirSesiPanel({
                   type="text"
                   placeholder="Nama pelanggan/rekanan"
                   value={editCustomer}
-                  onChange={(e) => setEditCustomer(e.target.value)}
-                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
+                  onChange={(e) => setEditCustomer(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none uppercase"
                 />
               </div>
 

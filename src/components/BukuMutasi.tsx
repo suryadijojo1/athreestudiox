@@ -574,8 +574,8 @@ export default function BukuMutasi({
                     type="text"
                     placeholder="Contoh: PROFESOR AGASA"
                     value={formCustomerName}
-                    onChange={(e) => setFormCustomerName(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-medium"
+                    onChange={(e) => setFormCustomerName(e.target.value.toUpperCase())}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-bold uppercase"
                   />
                 </div>
               )}
@@ -1031,8 +1031,8 @@ export default function BukuMutasi({
                   type="text"
                   placeholder="Nama pelanggan/rekanan"
                   value={editCustomer}
-                  onChange={(e) => setEditCustomer(e.target.value)}
-                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
+                  onChange={(e) => setEditCustomer(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none uppercase"
                 />
               </div>
 
