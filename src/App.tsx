@@ -2761,7 +2761,7 @@ export default function App() {
           </div>
 
           {/* Quick Settings Action: Reset database & Playground controls */}
-          {userRole !== 'PRODUKSI' && (
+          {userRole === 'OWNER' && (
             <div className="p-4 border-t border-indigo-100 space-y-2 bg-indigo-50/10">
               <button
                 id="sidebar-btn-clear-cache"
@@ -2774,16 +2774,11 @@ export default function App() {
 
               <button
                 id="sidebar-btn-seed-simulation"
-                onClick={userRole === 'OWNER' ? handleResetToPresets : undefined}
-                disabled={userRole !== 'OWNER'}
-                className={`w-full flex items-center justify-center gap-1.5 py-2.5 px-3 border rounded-xl text-xs font-bold transition duration-155 ${
-                  userRole === 'OWNER'
-                    ? 'bg-slate-50 hover:bg-rose-50 hover:text-rose-600 border-slate-200 hover:border-rose-100 text-slate-600 cursor-pointer'
-                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
-                }`}
+                onClick={handleResetToPresets}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 border rounded-xl text-xs font-bold transition duration-155 bg-slate-50 hover:bg-rose-50 hover:text-rose-600 border-slate-200 hover:border-rose-100 text-slate-600 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                Reset ke Data Simulasi {userRole !== 'OWNER' && '🔒'}
+                Reset ke Data Simulasi
               </button>
               <div className="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1">
                 <Sparkles className="w-2.5 h-2.5 text-indigo-400" />

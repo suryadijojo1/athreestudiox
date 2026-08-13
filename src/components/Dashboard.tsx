@@ -6,7 +6,8 @@
 import React from 'react';
 import { Product, Invoice, AuditLog, CashierSession, PaymentTransaction } from '../types';
 import LaporanSalesCategoryModal from './LaporanSalesCategoryModal';
-import { TrendingUp, Wallet, Landmark, AlertTriangle, ArrowUpRight, ArrowDownRight, Package, Lock, Calendar, Clock, Printer, X, AlertCircle, Download, Database, ChevronDown, ChevronUp, Check, Settings, RefreshCw, Layers, CheckCircle2, Activity, Edit, Trash2, Coins, RotateCcw, Users, BookOpen, FileSpreadsheet } from 'lucide-react';
+import { GoogleDriveModal } from './GoogleDriveModal';
+import { TrendingUp, Wallet, Landmark, AlertTriangle, ArrowUpRight, ArrowDownRight, Package, Lock, Calendar, Clock, Printer, X, AlertCircle, Download, Database, ChevronDown, ChevronUp, Check, Settings, RefreshCw, Layers, CheckCircle2, Activity, Edit, Trash2, Coins, RotateCcw, Users, BookOpen, FileSpreadsheet, Upload, Cloud } from 'lucide-react';
 import { motion } from 'motion/react';
 import JobSpecCard from './JobSpecCard';
 import { 
@@ -214,6 +215,7 @@ export default function Dashboard({
   const [salesDateFilter, setSalesDateFilter] = React.useState<'ALL' | 'MONTH' | 'WEEK'>('ALL');
   const [selectedSalesCode, setSelectedSalesCode] = React.useState<string | null>(null);
   const [showSalesCategoryReportModal, setShowSalesCategoryReportModal] = React.useState(false);
+  const [isDriveModalOpen, setIsDriveModalOpen] = React.useState(false);
 
   // Primary Metrics Period Filter States (Perbulan / ALL / YEAR / CUSTOM)
   const [dashboardPeriod, setDashboardPeriod] = React.useState<'MONTH' | 'ALL' | 'YEAR' | 'CUSTOM'>('MONTH');
@@ -413,6 +415,8 @@ export default function Dashboard({
     }
   };
 
+  const importBackupFileRef = React.useRef<HTMLInputElement>(null);
+
   const handleExportBackup = () => {
     try {
       const localProducts = localStorage.getItem('nota_stok_products') ? JSON.parse(localStorage.getItem('nota_stok_products')!) : products;
@@ -449,6 +453,56 @@ export default function Dashboard({
       console.error("Gagal melakukan ekspor data:", error);
       alert("Terjadi kesalahan saat mengekspor data cadangan.");
     }
+  };
+
+  const handleImportBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+
+        const data = parsed.data || parsed;
+        if (!data || (!data.invoices && !data.products)) {
+          alert("Format file cadangan (.json) tidak valid!");
+          return;
+        }
+
+        const confirmRestore = window.confirm(
+          `Apakah Anda yakin ingin memulihkan/mengimpor data cadangan ini?\n\n` +
+          `• Total Nota: ${data.invoices?.length || 0}\n` +
+          `• Total Produk: ${data.products?.length || 0}\n` +
+          `• Tanggal Berkas: ${parsed.exportedAt || 'Tidak diketahui'}\n\n` +
+          `Data lokal browser akan diperbarui dengan data dari file cadangan ini.`
+        );
+
+        if (!confirmRestore) return;
+
+        if (data.products && Array.isArray(data.products)) {
+          localStorage.setItem('nota_stok_products', JSON.stringify(data.products));
+        }
+        if (data.invoices && Array.isArray(data.invoices)) {
+          localStorage.setItem('nota_stok_invoices', JSON.stringify(data.invoices));
+        }
+        if (data.movements && Array.isArray(data.movements)) {
+          localStorage.setItem('nota_stok_movements', JSON.stringify(data.movements));
+        }
+        if (data.auditLogs && Array.isArray(data.auditLogs)) {
+          localStorage.setItem('nota_stok_audit_logs', JSON.stringify(data.auditLogs));
+        }
+
+        alert("Berhasil memulihkan data cadangan! Halaman akan dimuat ulang untuk menerapkan data.");
+        window.location.reload();
+      } catch (err) {
+        console.error("Gagal membaca file backup:", err);
+        alert("Terjadi kesalahan saat membaca file cadangan (.json). Pastikan file tidak rusak.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
   // Stats calculations
   // Calculations for daily cash inflow and outflow mutation (Berdasarkan Tanggal yang Dipilih)
@@ -1293,18 +1347,43 @@ export default function Dashboard({
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 self-start md:self-auto shrink-0">
+              <input 
+                ref={importBackupFileRef} 
+                type="file" 
+                accept=".json" 
+                onChange={handleImportBackupFile} 
+                className="hidden" 
+              />
               <button 
                 id="btn-export-backup"
                 onClick={handleExportBackup}
-                className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white transition-all font-black rounded-2xl shadow-lg shadow-emerald-900/20 text-xs uppercase tracking-wider border-2 border-emerald-400/40 cursor-pointer whitespace-nowrap"
+                className="flex items-center justify-center gap-2 px-5 py-4 bg-emerald-600 hover:bg-emerald-700 text-white transition-all font-black rounded-2xl shadow-lg shadow-emerald-900/20 text-xs uppercase tracking-wider border-2 border-emerald-400/40 cursor-pointer whitespace-nowrap"
               >
                 <Download className="w-4 h-4" />
-                Ekspor Data Sistem
+                Ekspor Backup
+              </button>
+              <button 
+                id="btn-import-backup"
+                onClick={() => importBackupFileRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-5 py-4 bg-teal-600 hover:bg-teal-700 text-white transition-all font-black rounded-2xl shadow-lg shadow-teal-900/20 text-xs uppercase tracking-wider border-2 border-teal-400/40 cursor-pointer whitespace-nowrap"
+                title="Pulihkan/Impor file cadangan JSON"
+              >
+                <Upload className="w-4 h-4" />
+                Impor Backup
+              </button>
+              <button 
+                id="btn-google-drive"
+                onClick={() => setIsDriveModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-5 py-4 bg-blue-600 hover:bg-blue-700 text-white transition-all font-black rounded-2xl shadow-lg shadow-blue-900/20 text-xs uppercase tracking-wider border-2 border-blue-400/40 cursor-pointer whitespace-nowrap"
+                title="Integrasi Google Drive untuk Backup & Restore Cloud"
+              >
+                <Cloud className="w-4 h-4" />
+                Google Drive
               </button>
               <button 
                 id="btn-print-summary"
                 onClick={() => setShowReportModal(true)}
-                className="flex items-center justify-center gap-2 px-6 py-4 bg-indigo-750 hover:bg-indigo-800 text-white transition-all font-black rounded-2xl shadow-lg shadow-indigo-900/20 text-xs uppercase tracking-wider border-2 border-indigo-400/40 cursor-pointer"
+                className="flex items-center justify-center gap-2 px-5 py-4 bg-indigo-750 hover:bg-indigo-800 text-white transition-all font-black rounded-2xl shadow-lg shadow-indigo-900/20 text-xs uppercase tracking-wider border-2 border-indigo-400/40 cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
                 Cetak Laporan
@@ -1312,7 +1391,7 @@ export default function Dashboard({
               <button 
                 id="btn-quick-new-note"
                 onClick={() => setActiveTab('nota-baru')}
-                className="flex items-center justify-center gap-2 px-6 py-4 bg-amber-400 hover:bg-amber-500 transition-all font-black rounded-2xl shadow-lg shadow-indigo-600/40 text-slate-900 border-none text-xs uppercase tracking-wider italic cursor-pointer whitespace-nowrap"
+                className="flex items-center justify-center gap-2 px-5 py-4 bg-amber-400 hover:bg-amber-500 transition-all font-black rounded-2xl shadow-lg shadow-indigo-600/40 text-slate-900 border-none text-xs uppercase tracking-wider italic cursor-pointer whitespace-nowrap"
               >
                 Buat Nota Baru
                 <ArrowUpRight className="w-4 h-4" />
@@ -3132,6 +3211,15 @@ export default function Dashboard({
         products={products}
         officialSalesList={officialSalesList}
         salesDateFilter={salesDateFilter}
+      />
+
+      {/* Google Drive Integration Modal */}
+      <GoogleDriveModal
+        isOpen={isDriveModalOpen}
+        onClose={() => setIsDriveModalOpen(false)}
+        products={products}
+        invoices={invoices}
+        auditLogs={auditLogs}
       />
 
     </div>

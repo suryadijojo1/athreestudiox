@@ -39,6 +39,61 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
     ];
   }, []);
 
+  const formatIndoDate = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const tableItems = React.useMemo(() => {
+    if (!invoice || !invoice.items) return [];
+    const parsed = invoice.items.map((item) => {
+      let size = '-';
+      let color = '-';
+      let productName = item.productName || '';
+
+      const sizeMatch = productName.match(/\b(XS|S|M|L|XL|XXL|3XL|4XL|5XL|ALL\s*SIZE|[2-5][0-8])\b/i);
+      if (sizeMatch) {
+        size = sizeMatch[0].toUpperCase();
+      }
+
+      const colorMatch = productName.match(/\b(PUTIH|HITAM|NAVY|MERAH|BIRU|HIJAU|KUNING|ABU|CREAM|MAROON|PINK|COKLAT|ORANGE|PURPLE|UNGU|SILVER|GOLD)\b/i);
+      if (colorMatch) {
+        color = colorMatch[0].toUpperCase();
+      }
+
+      return {
+        id: item.id,
+        qty: item.qty,
+        size,
+        color,
+        productName,
+        sellPrice: item.sellPrice,
+        total: item.total,
+      };
+    });
+
+    const totalRowsNeeded = Math.max(10, parsed.length);
+    const result = [...parsed];
+    for (let i = parsed.length; i < totalRowsNeeded; i++) {
+      result.push({
+        id: `empty-row-${i}`,
+        qty: 0,
+        size: '',
+        color: '',
+        productName: '',
+        sellPrice: 0,
+        total: 0,
+      });
+    }
+    return result;
+  }, [invoice]);
+
   const [printFormat, setPrintFormat] = useState<'a4' | 'pos80' | 'pos58'>(() => {
     const saved = localStorage.getItem('athree-workshop-print-format');
     return (saved as 'a4' | 'pos80' | 'pos58') || 'a4';
@@ -581,359 +636,256 @@ export default function NotaDetailModal({ invoice, onClose, onPaySettlement, onU
                 id="printable-receipt-sheet"
               >
                 {printFormat === 'a4' ? (
-                  <>
-              {/* Receipt Header (Convection Shop Identity / Letterhead) */}
-              <div className="flex flex-col md:flex-row md:justify-between border-b pb-5 border-slate-100 print:border-slate-300 print:flex-row gap-4 items-start">
-                <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                  {logoType !== 'none' && (
-                    <div className="shrink-0 p-1 bg-slate-50 border border-slate-100 rounded-xl print:bg-transparent print:border-none print:p-0">
-                      <LogoRenderer
-                        logoType={logoType}
-                        presetKey={presetKey}
-                        customUrl={customUrl}
-                        className="w-14 h-14 text-indigo-600 print:text-black"
-                      />
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    {/* Brand Logo or Text */}
-                    <h2 className="text-2xl font-black tracking-tight text-indigo-600 font-sans uppercase print:text-black">
-                      {shopName}
-                    </h2>
-                    <p className="text-xs text-slate-500 max-w-sm font-bold print:text-slate-600">
-                      {shopSlogan}
-                    </p>
-                    
-                    <div className="text-[11px] text-slate-500 space-y-0.5 pt-1.5 font-sans print:text-slate-700">
-                      <div className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-indigo-500 flex-shrink-0 print:text-slate-700" />
-                        <span>JL. Raya Tanah Hitam Ruko Samping Hiyake Resto, Jayapura</span>
-                      </div>
-                      <div className="flex items-center gap-1 font-semibold">
-                        <Phone className="w-3 h-3 text-indigo-500 flex-shrink-0 print:text-slate-700" />
-                        <span>WhatsApp: +62 812-3456-7890 | IG: @athreestudio_jayapura</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 md:mt-0 text-left md:text-right flex flex-col justify-between print:mt-0 print:text-right">
-                  <div>
-                    <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider font-sans">
-                      DOKUMEN NOTA
-                    </span>
-                    <h1 className="text-lg font-black font-mono text-indigo-600 print:text-black">
-                      {invoice.invoiceNum}
-                    </h1>
-                    <div className="text-xs text-slate-500 mt-1 print:text-slate-600 font-semibold">
-                      Tanggal: <strong className="text-slate-800 print:text-black font-bold">{new Date(invoice.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>
-                    </div>
-                    {invoice.deadlineDate && (
-                      <div className="text-xs text-slate-500 mt-1 print:text-slate-600 font-semibold">
-                        Deadline: <strong className="text-red-600 print:text-black font-bold">{new Date(invoice.deadlineDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-2.5 print:mt-1">
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-black rounded-full ${
-                      invoice.status === 'LUNAS' 
-                        ? 'bg-green-150/80 text-green-700 print:bg-slate-100 print:text-black' 
-                        : invoice.status === 'DP' 
-                        ? 'bg-indigo-100 text-indigo-750 print:bg-slate-100 print:text-black'
-                        : 'bg-rose-100 text-rose-700 print:bg-slate-100 print:text-black'
-                    }`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                      STATUS: {invoice.customStatusLabel || invoice.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Banner Peringatan Red Shape jika Barang DIAMBIL tapi Belum Lunas */}
-              {(invoice.productionStatus === 'SUDAH_DIAMBIL' || invoice.productionStatus === 'SIAP_DIAMBIL') && invoice.remainingDebt > 0 && (
-                <div className="mb-4 bg-gradient-to-r from-rose-600 to-red-700 text-white p-4 rounded-2xl shadow-lg border-2 border-rose-500 animate-pulse flex items-center justify-between gap-3 print:hidden">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-white/20 p-2 rounded-xl shrink-0">
-                      <AlertTriangle className="w-6 h-6 text-amber-300" />
-                    </div>
-                    <div>
-                      <h4 className="font-black text-sm uppercase tracking-wider text-white">
-                        🔴 TANDA MERAH: BARANG SUDAH DIAMBIL — BELUM LUNAS!
-                      </h4>
-                      <p className="text-xs text-rose-100 font-semibold mt-0.5">
-                        Barang pesanan telah diserahkan/diambil, tetapi pelanggan masih memiliki sisa piutang sebesar{' '}
-                        <strong className="text-amber-300 font-mono text-sm underline decoration-2">{formatRp(invoice.remainingDebt)}</strong>.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Customer & Spec Details */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-sans print:grid-cols-3">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/80 print:bg-white print:border-slate-300">
-                  <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                    DITUJUKAN KEPADA
-                  </span>
-                  <p className="text-sm font-black text-indigo-600 mt-1 print:text-black">
-                    {invoice.customerName}
-                  </p>
-                  {invoice.customerPhone && (
-                    <p className="text-slate-600 mt-0.5 print:text-slate-700 font-semibold">
-                      No. Telp / WA: <strong className="font-mono text-slate-800 print:text-black">{invoice.customerPhone}</strong>
-                    </p>
-                  )}
-                  {invoice.salesCode && (() => {
-                    const agent = salesAgents.find(s => s.code.toUpperCase() === invoice.salesCode?.trim().toUpperCase());
-                    return (
-                      <p className="text-slate-600 mt-1 print:text-slate-705 font-bold text-xs flex items-center flex-wrap gap-1">
-                        Sales: <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-lg uppercase tracking-wider print:border print:border-slate-300">{invoice.salesCode}</span>
-                        {agent && <span className="text-[11px] text-slate-500 font-medium font-sans">({agent.name})</span>}
-                      </p>
-                    );
-                  })()}
-                </div>
-
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/80 print:bg-white print:border-slate-300">
-                  <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">
-                    STATUS PRODUKSI
-                  </span>
-                  
-                  {/* Screen version: Select interactive dropdown */}
-                  <div className="print:hidden mt-1">
-                    {onUpdateProductionStatus ? (
-                      <select
-                        id="modal-select-production-status"
-                        value={invoice.productionStatus || 'ANTREAN'}
-                        onChange={(e) => onUpdateProductionStatus(invoice.id, e.target.value as any)}
-                        className={`w-full px-2.5 py-1.5 text-xs font-extrabold rounded-xl border border-indigo-150 cursor-pointer outline-none transition ${
-                          (invoice.productionStatus || 'ANTREAN') === 'ANTREAN'
-                            ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            : (invoice.productionStatus || 'ANTREAN') === 'DESAIN'
-                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                            : (invoice.productionStatus || 'ANTREAN') === 'PROSES'
-                            ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                            : (invoice.productionStatus || 'ANTREAN') === 'SELESAI'
-                            ? 'bg-teal-100 text-teal-700 hover:bg-teal-200'
-                            : 'bg-green-100 text-green-700 hover:bg-green-200'
-                        }`}
-                      >
-                        <option value="ANTREAN">⏳ ANTREAN</option>
-                        <option value="DESAIN">🎨 DESAIN</option>
-                        <option value="PROSES">⚙️ PROSES</option>
-                        <option value="SELESAI">✅ SELESAI</option>
-                        <option value="SIAP_DIAMBIL">📦 SIAP</option>
-                        <option value="SUDAH_DIAMBIL">🤝 DIAMBIL</option>
-                      </select>
-                    ) : (
-                      <span className="font-extrabold text-xs text-indigo-600 block mt-1">
-                        {invoice.productionStatus || 'ANTREAN'}
-                      </span>
-                    )}
-                    <span className="text-[9px] text-slate-400 mt-1 block">Status pengerjaan tim sablon/jahit</span>
-                  </div>
-
-                  {/* Print version: Static text badge */}
-                  <div className="hidden print:block mt-1.5 font-black text-xs text-black">
-                    {invoice.productionStatus === 'DESAIN' && '🎨 TAHAP DESAIN'}
-                    {invoice.productionStatus === 'PROSES' && '⚙️ PROSES PRODUKSI'}
-                    {invoice.productionStatus === 'SELESAI' && '✅ SELESAI PRODUKSI'}
-                    {invoice.productionStatus === 'SIAP_DIAMBIL' && '📦 BARANG SIAP DIAMBIL'}
-                    {invoice.productionStatus === 'SUDAH_DIAMBIL' && '🤝 BARANG SUDAH DI AMBIL'}
-                    {(!invoice.productionStatus || invoice.productionStatus === 'ANTREAN') && '⏳ ANTREAN PRODUKSI'}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <span className="text-[10px] uppercase font-black text-indigo-600 tracking-wider block px-1">
-                    📋 SPK & SPESIFIKASI PEKERJAAN
-                  </span>
-                  <JobSpecCard invoice={invoice} showStatusDropdown={false} className="border-indigo-150 shadow-xs" />
-                </div>
-              </div>
-
-              {/* Table of items */}
-              <div className="border-2 border-indigo-100 rounded-2xl overflow-hidden print:border-slate-300 animate-slide-up">
-                <table className="w-full text-left text-xs border-collapse font-sans">
-                  <thead>
-                    <tr className="bg-indigo-50/60 text-indigo-700 font-black border-none print:bg-slate-100 print:text-slate-900 print:border-slate-300">
-                      <th className="px-3.5 py-3 text-center w-10">No</th>
-                      <th className="px-3.5 py-3">Nama Item Belanja</th>
-                      <th className="px-3.5 py-3 text-right w-24">Harga Satuan</th>
-                      <th className="px-4 py-3 text-center w-12">Qty</th>
-                      <th className="px-3.5 py-3 text-right w-28 font-black">Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-indigo-50 text-slate-755 print:divide-slate-200 print:text-slate-950">
-                    {invoice.items.map((item, idx) => (
-                      <tr key={item.id} className="hover:bg-indigo-50/10 transition-colors">
-                        <td className="px-3.5 py-3 text-center font-mono text-slate-400 font-bold print:text-slate-600">{idx + 1}</td>
-                        <td className="px-3.5 py-3">
-                          <div className="font-black text-slate-800">{item.productName}</div>
-                        </td>
-                        <td className="px-3.5 py-3 text-right font-mono font-semibold">{formatRp(item.sellPrice)}</td>
-                        <td className="px-4 py-3 text-center font-mono font-black text-slate-800 print:text-black">{item.qty}</td>
-                        <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900">{formatRp(item.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Payment Terms Summary Sheet */}
-              <div className="flex flex-col md:flex-row md:justify-between items-start gap-4 pt-2 border-t border-slate-100 print:border-slate-350 print:flex-row col-gap-5">
-                
-                <div className="text-slate-400 text-[10px] space-y-1 max-w-sm print:text-slate-700 leading-relaxed font-semibold">
-                  <p className="text-slate-500">📌 <strong>Ketentuan Konveksi & Sablon:</strong></p>
-                  <ul className="list-disc list-inside space-y-0.5">
-                    <li>Nota ini adalah bukti pesanan sah dan terintegrasi sistem gudang otomatis.</li>
-                    <li>Barang yang sudah dipotong/sablon tidak dapat diubah ukurannya.</li>
-                    <li>Sisa Tagihan (Piutang) wajib dilunasi selambatnya saat pengambilan pesanan.</li>
-                  </ul>
-
-                  {bankAccounts.length > 0 && (
-                    <div className="mt-3 p-2.5 bg-slate-50/70 rounded-xl border border-dashed border-slate-200 print:bg-transparent print:border-slate-300">
-                      <p className="text-[9px] font-black text-slate-550 uppercase tracking-wider mb-1 flex items-center gap-1">🏦 Rekening Transfer Bank Resmi Toko:</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[9px] font-mono leading-normal">
-                        {bankAccounts.map((acc: any) => (
-                          <div key={acc.id} className="text-slate-650 dark:text-slate-350 pl-1.5 border-l border-indigo-400 print:border-slate-400">
-                            <strong>{acc.bankName}</strong>: {acc.accountNumber} <br />
-                            a/n {acc.accountOwner}
+                  <div className="text-black font-sans bg-white p-2 sm:p-5 print:p-0 max-w-[210mm] mx-auto border border-slate-300 print:border-none shadow-xs print:shadow-none space-y-3">
+                    {/* Screen-only Alert Banner if Taken with Debt */}
+                    {(invoice.productionStatus === 'SUDAH_DIAMBIL' || invoice.productionStatus === 'SIAP_DIAMBIL') && invoice.remainingDebt > 0 && (
+                      <div className="bg-gradient-to-r from-rose-600 to-red-700 text-white p-3 rounded-xl shadow-md border-2 border-rose-500 animate-pulse flex items-center justify-between gap-3 print:hidden">
+                        <div className="flex items-center gap-2.5">
+                          <AlertTriangle className="w-5 h-5 text-amber-300 shrink-0" />
+                          <div className="text-xs font-bold">
+                            🔴 TANDA MERAH: BARANG SUDAH DIAMBIL TAPI BELUM LUNAS! Sisa Piutang: {formatRp(invoice.remainingDebt)}
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
 
-                {/* Calculations Blocks */}
-                <div className="w-full md:w-64 space-y-1.5 text-xs text-slate-500 print:text-slate-900 self-end font-semibold">
-                  <div className="flex justify-between">
-                    <span>Total Jumlah Barang:</span>
-                    <span className="font-mono font-black text-slate-800 print:text-black">{invoice.totalQty} pcs</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Total Tagihan:</span>
-                    <span className="font-mono font-black text-slate-800 print:text-black">{formatRp(invoice.totalAmount)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>DP (Uang Muka Masuk):</span>
-                    <span className="font-mono text-emerald-650 font-black print:text-emerald-800">{formatRp(invoice.downPayment)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Pelunasan Bertahap:</span>
-                    <span className="font-mono text-slate-500 print:text-slate-650 font-bold">{formatRp(invoice.settlement)}</span>
-                  </div>
-                  
-                  <div className="flex justify-between pt-2 border-t border-indigo-150 font-black print:border-slate-300">
-                    <span className="text-slate-800 print:text-black">Sisa Tagihan (Piutang):</span>
-                    <span className={`font-mono ${invoice.remainingDebt > 0 ? 'text-rose-600 font-black print:text-slate-900' : 'text-slate-500 print:text-slate-700'}`}>
-                      {formatRp(invoice.remainingDebt)}
-                    </span>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Rincian Riwayat Pembayaran (Dengan Tanggal) */}
-              <div className="mt-4 p-3.5 bg-indigo-50/30 rounded-2xl border border-indigo-100/70 space-y-2 text-xs font-sans print:bg-slate-50 print:border-slate-300">
-                <div className="flex justify-between items-center border-b border-indigo-100/60 pb-2 print:border-slate-300">
-                  <span className="font-black text-slate-700 uppercase tracking-tight flex items-center gap-1.5 text-xs print:text-black">
-                    <Calendar className="w-3.5 h-3.5 text-indigo-600 print:text-black" /> RINCIAN / RIWAYAT PEMBAYARAN
-                  </span>
-                  <span className="text-[10px] font-bold text-indigo-700 print:text-slate-800">
-                    {invoice.remainingDebt === 0 ? 'Lunas Penuh' : `Sisa ${formatRp(invoice.remainingDebt)}`}
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  {/* Uang Muka DP Row */}
-                  {invoice.downPayment > 0 && (
-                    <div className="flex items-center justify-between p-2 bg-white rounded-xl border border-indigo-50/80 text-[11px] print:border-slate-200">
-                      <div className="flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider">
-                          DP
-                        </span>
+                    {/* TOP HEADER: LEFT (A3 ATHREE STUDIO) | RIGHT (JAYAPURA, NAMA, ALAMAT, TELP, FORM) */}
+                    <div className="grid grid-cols-12 border-b-2 border-black pb-2.5 items-stretch">
+                      {/* Left Column Header */}
+                      <div className="col-span-5 border-r-2 border-black pr-3 flex flex-col justify-between">
                         <div>
-                          <div className="font-bold text-slate-800 print:text-black">Uang Muka (DP)</div>
-                          <div className="text-[10px] text-slate-400 font-mono font-semibold print:text-slate-600">
-                            {new Date(invoice.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          <h1 className="text-4xl font-black tracking-tighter text-black font-sans leading-none">A3</h1>
+                          <h2 className="text-xs sm:text-sm font-black text-black tracking-wider uppercase mt-0.5">ATHREE STUDIO</h2>
+                          
+                          <div className="border-y-2 border-black py-0.5 my-1 text-center">
+                            <span className="font-extrabold text-[10px] sm:text-[11px] uppercase tracking-widest text-black block">PREMIUM SABLON</span>
+                          </div>
+
+                          {/* Care symbols icon strip */}
+                          <div className="border border-black rounded-sm p-1 my-1 flex justify-around items-center text-[10px] font-bold">
+                            <span title="Wash 30°" className="border border-black px-1 rounded-sm text-[8px] font-mono">30°</span>
+                            <span title="Do not bleach" className="font-black text-xs">✕</span>
+                            <span title="Tumble dry" className="border border-black w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px]">◯</span>
+                            <span title="Dry clean" className="border border-black w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px]">P</span>
+                            <span title="Hang dry" className="border-t border-black w-3 h-1.5 block"></span>
                           </div>
                         </div>
+
+                        <div className="text-center font-black text-[9px] sm:text-[10px] uppercase tracking-widest text-black mt-0.5">
+                          MADE IN JAYAPURA
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-mono font-black text-emerald-700 print:text-black">{formatRp(invoice.downPayment)}</div>
-                        <span className="text-[9.5px] font-bold text-slate-400 uppercase print:text-slate-600">{invoice.paymentMethodDP || 'CASH'}</span>
+
+                      {/* Right Column Customer Info */}
+                      <div className="col-span-7 pl-3 flex flex-col justify-between text-xs text-black font-semibold space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="w-16 sm:w-20 font-bold shrink-0">Jayapura,</span>
+                          <span className="font-bold border-b border-dotted border-black flex-1 text-right pr-1">
+                            {formatIndoDate(invoice.date)}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="w-16 sm:w-20 font-bold shrink-0">Nama</span>
+                          <span className="font-bold shrink-0 mr-1">:</span>
+                          <span className="font-bold border-b border-dotted border-black flex-1 pl-1">
+                            {invoice.customerName}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="w-16 sm:w-20 font-bold shrink-0">Alamat</span>
+                          <span className="font-bold shrink-0 mr-1">:</span>
+                          <span className="font-medium border-b border-dotted border-black flex-1 pl-1 text-slate-800">
+                            {invoice.customerAddress || '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="w-16 sm:w-20 font-bold shrink-0">No. Telp</span>
+                          <span className="font-bold shrink-0 mr-1">:</span>
+                          <span className="font-mono font-bold border-b border-dotted border-black flex-1 pl-1">
+                            {invoice.customerPhone || '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="w-16 sm:w-20 font-bold shrink-0">No. Form</span>
+                          <span className="font-bold shrink-0 mr-1">:</span>
+                          <span className="font-mono font-black border-b border-dotted border-black flex-1 pl-1 text-indigo-900 print:text-black">
+                            {invoice.invoiceNum}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  )}
 
-                  {/* Pelunasan / Cicilan Transactions */}
-                  {invoicePayments.length > 0 ? (
-                    invoicePayments.map((tx, idx) => (
-                      <div key={tx.id || idx} className="flex items-center justify-between p-2 bg-white rounded-xl border border-indigo-50/80 text-[11px] print:border-slate-200">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase tracking-wider">
-                            {tx.type === 'DP' ? 'DP' : `PELUNASAN #${idx + 1}`}
-                          </span>
+                    {/* INVOICE TITLE ROW */}
+                    <div className="flex items-center justify-between py-0.5">
+                      <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-black font-sans uppercase">
+                        INVOICE
+                      </h2>
+                      <div className="border-2 border-black rounded-full px-4 sm:px-5 py-0.5 font-black text-xs text-black flex items-center gap-1">
+                        <span>No:</span>
+                        <span className="font-mono text-xs sm:text-sm">{invoice.invoiceNum}</span>
+                      </div>
+                    </div>
+
+                    {/* MAIN ITEMS TABLE GRID */}
+                    <div className="border-2 border-black overflow-hidden text-xs">
+                      <table className="w-full border-collapse text-black font-sans">
+                        <thead>
+                          <tr className="border-b-2 border-black font-black uppercase text-center text-[10px] sm:text-[11px] bg-slate-50 print:bg-white">
+                            <th className="border-r border-black py-1 px-1 sm:px-2 w-10 sm:w-12">PCS</th>
+                            <th className="border-r border-black py-1 px-1 sm:px-2 w-12 sm:w-14">SIZE</th>
+                            <th className="border-r border-black py-1 px-1 sm:px-2 w-16 sm:w-20">WARNA</th>
+                            <th className="border-r border-black py-1 px-2 sm:px-3 text-left">KETERANGAN</th>
+                            <th className="border-r border-black py-1 px-1 sm:px-2 text-right w-24 sm:w-28">H. SATUAN</th>
+                            <th className="py-1 px-1 sm:px-2 text-right w-28 sm:w-32">TOTAL</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tableItems.map((item, idx) => (
+                            <tr key={item.id || idx} className="border-b border-black text-black h-7">
+                              <td className="border-r border-black text-center font-mono font-bold py-0.5 px-1">
+                                {item.qty > 0 ? item.qty : ''}
+                              </td>
+                              <td className="border-r border-black text-center font-bold uppercase py-0.5 px-1">
+                                {item.size}
+                              </td>
+                              <td className="border-r border-black text-center font-bold uppercase py-0.5 px-1">
+                                {item.color}
+                              </td>
+                              <td className="border-r border-black font-semibold py-0.5 px-2">
+                                {item.productName}
+                              </td>
+                              <td className="border-r border-black text-right font-mono font-semibold py-0.5 px-1 sm:px-2">
+                                {item.sellPrice > 0 ? item.sellPrice.toLocaleString('id-ID') : ''}
+                              </td>
+                              <td className="text-right font-mono font-bold py-0.5 px-1 sm:px-2">
+                                {item.total > 0 ? item.total.toLocaleString('id-ID') : ''}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      {/* SUMMARY FOOTER (CATATAN LEFT | TOTAL, DP, SISA RIGHT) */}
+                      <div className="border-t-2 border-black grid grid-cols-12 text-xs">
+                        {/* Catatan Left */}
+                        <div className="col-span-7 border-r-2 border-black p-2 font-semibold text-[10px] sm:text-[10.5px] leading-tight flex flex-col justify-between">
                           <div>
-                            <div className="font-bold text-slate-800 print:text-black">
-                              {tx.type === 'DP' ? 'Pembayaran Uang Muka' : 'Pelunasan / Cicilan'}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono font-semibold print:text-slate-600">
-                              {new Date(tx.timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </div>
+                            <span className="font-bold text-black block mb-0.5">Catatan :</span>
+                            <ol className="list-decimal list-inside space-y-0.5 text-black">
+                              <li>Periksa kembali File Sebelum Cetak.</li>
+                              <li>Wajib DP min 70%. Barang &gt;1 bln tidak diambil diluar tanggung jawab kami.</li>
+                              <li>Pembayaran SAH dengan bukti transfer.</li>
+                            </ol>
+                            {invoice.notes && (
+                              <div className="mt-1 pt-1 border-t border-dashed border-black italic text-[9.5px] font-medium text-black">
+                                Catatan Tambahan: {invoice.notes}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-mono font-black text-indigo-700 print:text-black">{formatRp(tx.amount)}</div>
-                          <span className="text-[9.5px] font-bold text-slate-400 uppercase print:text-slate-600">{tx.method}</span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    invoice.settlement > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-white rounded-xl border border-indigo-50/80 text-[11px] print:border-slate-200">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase tracking-wider">
-                            PELUNASAN
-                          </span>
-                          <div>
-                            <div className="font-bold text-slate-800 print:text-black">Pelunasan Tagihan</div>
-                            <div className="text-[10px] text-slate-400 font-mono font-semibold print:text-slate-600">
-                              {new Date(invoice.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </div>
+
+                        {/* Totals Grid Right */}
+                        <div className="col-span-5 flex flex-col justify-between font-sans">
+                          <div className="border-b border-black flex justify-between px-2 sm:px-3 py-1">
+                            <span className="font-black uppercase text-[11px]">TOTAL</span>
+                            <span className="font-mono font-black text-xs sm:text-sm">{invoice.totalAmount.toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="border-b border-black flex justify-between px-2 sm:px-3 py-1">
+                            <span className="font-black uppercase text-[11px]">DP</span>
+                            <span className="font-mono font-bold text-xs">{invoice.downPayment > 0 ? invoice.downPayment.toLocaleString('id-ID') : ''}</span>
+                          </div>
+                          <div className="flex justify-between px-2 sm:px-3 py-1">
+                            <span className="font-black uppercase text-[11px]">SISA</span>
+                            <span className={`font-mono font-black text-xs sm:text-sm ${invoice.remainingDebt > 0 ? 'text-red-600 print:text-red-600 font-extrabold' : 'text-black'}`}>
+                              {invoice.remainingDebt.toLocaleString('id-ID')}
+                            </span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-mono font-black text-indigo-700 print:text-black">{formatRp(invoice.settlement)}</div>
-                          <span className="text-[9.5px] font-bold text-slate-400 uppercase print:text-slate-600">{invoice.paymentMethodSettlement || 'CASH'}</span>
+                      </div>
+                    </div>
+
+                    {/* SIGNATURES AND DATES */}
+                    <div className="pt-2 pb-0.5 grid grid-cols-3 text-xs font-semibold text-black gap-2">
+                      {/* Dates Column Left */}
+                      <div className="space-y-1">
+                        <div className="flex items-center">
+                          <span className="w-16 sm:w-20 shrink-0 text-[11px]">Terima tgl</span>
+                          <span>:</span>
+                          <span className="border-b border-black flex-1 ml-1 pl-1 font-bold text-[11px]">
+                            {formatIndoDate(invoice.date)}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="w-16 sm:w-20 shrink-0 text-[11px]">Selesai tgl</span>
+                          <span>:</span>
+                          <span className="border-b border-black flex-1 ml-1 pl-1 font-bold text-[11px]">
+                            {invoice.deadlineDate ? formatIndoDate(invoice.deadlineDate) : '..........................'}
+                          </span>
                         </div>
                       </div>
-                    )
-                  )}
-                </div>
-              </div>
 
-              {/* Signatures Field (Required for physical convection receipts) */}
-              <div className="grid grid-cols-2 gap-10 text-center text-xs pt-8 border-t border-slate-100 print:border-slate-300">
-                <div className="space-y-12">
-                  <p className="text-slate-400 font-bold print:text-slate-700">Penerima / Pemesan</p>
-                  <div className="inline-block border-b border-dashed border-slate-300 w-32 print:border-slate-700" />
-                  <p className="text-[10px] text-slate-500 font-medium print:text-slate-750">( {invoice.customerName.split(' ')[0]} )</p>
-                </div>
-                
-                <div className="space-y-12">
-                  <p className="text-slate-400 font-bold print:text-slate-700">Hormat Kami (Athree Studio)</p>
-                  <div className="inline-block border-b border-dashed border-slate-300 w-32 print:border-slate-700" />
-                  <p className="text-[10px] text-slate-500 font-medium print:text-slate-755">( Administrasi Toko )</p>
-                </div>
-              </div>
-            </>
-          ) : (
-            /* Dedicated POS Thermal Receipt Layout */
-            <div className={`flex flex-col items-center text-black font-mono leading-relaxed mx-auto text-left w-full ${
+                      {/* Pemesan Center */}
+                      <div className="text-center flex flex-col justify-between h-16 sm:h-20">
+                        <span className="text-[11px]">Pemesan,</span>
+                        <div className="border-b border-black w-28 sm:w-36 mx-auto"></div>
+                      </div>
+
+                      {/* Penerima Right */}
+                      <div className="text-center flex flex-col justify-between h-16 sm:h-20">
+                        <span className="text-[11px]">Penerima,</span>
+                        <div className="border-b border-black w-28 sm:w-36 mx-auto"></div>
+                      </div>
+                    </div>
+
+                    {/* BOTTOM PILL BAR */}
+                    <div className="border-2 border-black rounded-full px-4 sm:px-6 py-1 flex items-center justify-between text-[10px] sm:text-xs font-black text-black mt-2">
+                      <div className="flex items-center gap-1">
+                        <span>📷</span>
+                        <span>@athree_studio_jayapura</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span>📞</span>
+                        <span>0852-5461-5639</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span>📍</span>
+                        <span>Jayapura-Papua</span>
+                      </div>
+                    </div>
+
+                    {/* Screen-Only Extra Admin Details & Payment History */}
+                    <div className="print:hidden mt-4 pt-4 border-t border-slate-200 space-y-3 text-xs">
+                      <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                        <span className="font-bold text-slate-700">⚙️ Status Pengerjaan Produksi:</span>
+                        {onUpdateProductionStatus ? (
+                          <select
+                            id="modal-select-production-status-a4"
+                            value={invoice.productionStatus || 'ANTREAN'}
+                            onChange={(e) => onUpdateProductionStatus(invoice.id, e.target.value as any)}
+                            className="px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white"
+                          >
+                            <option value="ANTREAN">⏳ ANTREAN</option>
+                            <option value="DESAIN">🎨 DESAIN</option>
+                            <option value="PROSES">⚙️ PROSES</option>
+                            <option value="SELESAI">✅ SELESAI</option>
+                            <option value="SIAP_DIAMBIL">📦 SIAP</option>
+                            <option value="SUDAH_DIAMBIL">🤝 DIAMBIL</option>
+                          </select>
+                        ) : (
+                          <span className="font-black text-indigo-700">{invoice.productionStatus || 'ANTREAN'}</span>
+                        )}
+                      </div>
+
+                      {/* Job Spec Card for screen */}
+                      <div className="space-y-1">
+                        <span className="font-bold text-slate-600 block text-[11px]">📋 Spesifikasi SPK Tambahan:</span>
+                        <JobSpecCard invoice={invoice} showStatusDropdown={false} className="border-slate-200" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Dedicated POS Thermal Receipt Layout */
+                  <div className={`flex flex-col items-center text-black font-mono leading-relaxed mx-auto text-left w-full ${
               monochromeMode ? 'filter grayscale contrast-125 font-bold' : ''
             }`}>
               <div className="text-center w-full space-y-1 flex flex-col items-center">

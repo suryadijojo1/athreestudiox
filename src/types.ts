@@ -62,6 +62,7 @@ export interface Invoice {
   date: string; // YYYY-MM-DD
   customerName: string; // Nama Pemesan / Tim
   customerPhone?: string;
+  customerAddress?: string;
   items: InvoiceItem[];
   totalQty: number;
   totalAmount: number; // Total Tagihan
