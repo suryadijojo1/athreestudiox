@@ -115,102 +115,6 @@ export default function Dashboard({
   const [showOtherSettings, setShowOtherSettings] = React.useState(false);
   const [isSimulatingPrint, setIsSimulatingPrint] = React.useState(false);
 
-  // States for revising opening balance on Dashboard
-  const [isEditingDashboardOpening, setIsEditingDashboardOpening] = React.useState(false);
-  const [revisedDashboardOpening, setRevisedDashboardOpening] = React.useState('');
-
-  // States for daily cash flow mutation form in Cashier Dashboard view
-  const [mutationType, setMutationType] = React.useState<'PEMASUKAN' | 'PENGELUARAN'>('PEMASUKAN');
-  const [mutationMethod, setMutationMethod] = React.useState<'CASH' | 'TRANSFER'>('CASH');
-  const [mutationNotes, setMutationNotes] = React.useState('');
-  const [mutationAmount, setMutationAmount] = React.useState('');
-  const [mutationCustomer, setMutationCustomer] = React.useState('');
-  const [isSubmittingMutation, setIsSubmittingMutation] = React.useState(false);
-  const [mutationFilter, setMutationFilter] = React.useState<'SEMUA' | 'MASUK' | 'KELUAR'>('SEMUA');
-  const [isMutationFormOpen, setIsMutationFormOpen] = React.useState(false);
-  const [selectedMutationDate, setSelectedMutationDate] = React.useState(() => {
-    const d = new Date();
-    const offset = d.getTimezoneOffset();
-    const localDate = new Date(d.getTime() - (offset * 60 * 1000));
-    return localDate.toISOString().split('T')[0];
-  });
-
-  // States for Editing/Modifying Mutasi (Owner level)
-  const [editingTransaction, setEditingTransaction] = React.useState<PaymentTransaction | null>(null);
-  const [editAmount, setEditAmount] = React.useState('');
-  const [editNotes, setEditNotes] = React.useState('');
-  const [editCustomer, setEditCustomer] = React.useState('');
-  const [editMethod, setEditMethod] = React.useState<'CASH' | 'TRANSFER'>('CASH');
-  const [editType, setEditType] = React.useState<'DP' | 'PELUNASAN' | 'PENGELUARAN'>('PELUNASAN');
-  const [editTimestamp, setEditTimestamp] = React.useState('');
-  const [isSavingEdit, setIsSavingEdit] = React.useState(false);
-
-  // Load transaction values into edit form
-  const handleStartEdit = (tx: PaymentTransaction) => {
-    setEditingTransaction(tx);
-    setEditAmount(tx.amount.toLocaleString('id-ID'));
-    setEditNotes(tx.notes || '');
-    setEditCustomer(tx.customerName || '');
-    setEditMethod(tx.method);
-    setEditType(tx.type);
-    setEditTimestamp(tx.timestamp);
-  };
-
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingTransaction) return;
-
-    const parsedAmount = parseFloat(editAmount.replace(/[^0-9]/g, ''));
-    if (!parsedAmount || parsedAmount <= 0) {
-      alert("Harap masukkan nominal transaksi mutasi yang valid!");
-      return;
-    }
-    if (!editNotes.trim()) {
-      alert("Harap masukkan keterangan/keperluan mutasi!");
-      return;
-    }
-
-    setIsSavingEdit(true);
-    try {
-      const updatedTx: PaymentTransaction = {
-        ...editingTransaction,
-        amount: parsedAmount,
-        method: editMethod,
-        type: editType,
-        notes: editNotes.trim(),
-        customerName: editCustomer.trim() ? editCustomer.trim() : undefined,
-        timestamp: editTimestamp || new Date().toISOString()
-      };
-
-      if (onUpdateCustomTransaction) {
-        await onUpdateCustomTransaction(updatedTx);
-      }
-      setEditingTransaction(null);
-    } catch (err) {
-      console.error("Gagal mengubah transaksi:", err);
-      alert("Gagal menyimpan perubahan transaksi!");
-    } finally {
-      setIsSavingEdit(false);
-    }
-  };
-
-  const handleDeleteMutationClick = async (txId: string) => {
-    if (userRole !== 'OWNER') {
-      alert("Hanya akun OWNER yang berwenang dalam memproses penghapusan transaksi buku mutasi harian!");
-      return;
-    }
-    if (confirm("Apakah Anda yakin ingin menghapus transaksi ini? Tindakan ini akan dicatat di Log Audit.")) {
-      try {
-        if (onDeleteCustomTransaction) {
-          await onDeleteCustomTransaction(txId);
-        }
-      } catch (err) {
-        console.error("Gagal menghapus transaksi:", err);
-        alert("Gagal menghapus transaksi!");
-      }
-    }
-  };
-
   // Sales Performance Report States and Aggregations
   const [salesDateFilter, setSalesDateFilter] = React.useState<'ALL' | 'MONTH' | 'WEEK'>('ALL');
   const [selectedSalesCode, setSelectedSalesCode] = React.useState<string | null>(null);
@@ -371,50 +275,6 @@ export default function Dashboard({
     document.body.removeChild(link);
   };
 
-  // Handle manual mutation post on the cashier dashboard
-  const handleAddMutation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsedAmount = parseFloat(mutationAmount.replace(/[^0-9]/g, ''));
-    if (!parsedAmount || parsedAmount <= 0) {
-      alert("Harap masukkan nominal transaksi mutasi yang valid!");
-      return;
-    }
-    if (!mutationNotes.trim()) {
-      alert("Harap masukkan keterangan/keperluan mutasi!");
-      return;
-    }
-
-    setIsSubmittingMutation(true);
-    try {
-      const txId = `tx-${Date.now()}`;
-      const newTx: PaymentTransaction = {
-        id: txId,
-        amount: parsedAmount,
-        method: mutationMethod,
-        type: mutationType === 'PENGELUARAN' ? 'PENGELUARAN' : 'PELUNASAN',
-        timestamp: new Date().toISOString(),
-        cashier: userRole === 'OWNER' ? 'OWNER' : 'KASIR',
-        notes: mutationNotes.trim(),
-        customerName: mutationCustomer.trim() ? mutationCustomer.trim() : undefined
-      };
-
-      if (onAddCustomTransaction) {
-        await onAddCustomTransaction(newTx);
-      }
-      
-      // Resets
-      setMutationAmount('');
-      setMutationNotes('');
-      setMutationCustomer('');
-      setIsMutationFormOpen(false);
-    } catch (err) {
-      console.error("Gagal menambahkan mutasi:", err);
-      alert("Gagal menambahkan mutasi kas harian!");
-    } finally {
-      setIsSubmittingMutation(false);
-    }
-  };
-
   const importBackupFileRef = React.useRef<HTMLInputElement>(null);
 
   const handleExportBackup = () => {
@@ -505,100 +365,6 @@ export default function Dashboard({
     e.target.value = '';
   };
   // Stats calculations
-  // Calculations for daily cash inflow and outflow mutation (Berdasarkan Tanggal yang Dipilih)
-  const todayTransactions = React.useMemo(() => {
-    const [year, month, day] = selectedMutationDate.split('-').map(Number);
-    const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
-
-    return paymentTransactions.filter(p => {
-      try {
-        const pDate = new Date(p.timestamp);
-        return pDate.getTime() >= startOfDay.getTime() && pDate.getTime() <= endOfDay.getTime();
-      } catch {
-        return false;
-      }
-    });
-  }, [paymentTransactions, selectedMutationDate]);
-
-  // Load sessions from prop or local storage to find Modal Awal (opening balance)
-  const sessions = React.useMemo(() => {
-    if (sessionsHistory && sessionsHistory.length > 0) {
-      return sessionsHistory;
-    }
-    try {
-      const stored = localStorage.getItem('nota_stok_sessions_history');
-      if (stored) {
-        return JSON.parse(stored) as CashierSession[];
-      }
-    } catch (e) {
-      console.error("Gagal memuat sessions history di Dashboard:", e);
-    }
-    return [];
-  }, [sessionsHistory]);
-
-  const modalAwal = React.useMemo(() => {
-    const todayStrValue = getLocalDateString(new Date());
-    if (selectedMutationDate === todayStrValue && activeSession) {
-      return activeSession.openingBalance;
-    }
-    const matchedSession = sessions.find(s => {
-      try {
-        const sDate = getLocalDateString(s.openedAt);
-        return sDate === selectedMutationDate;
-      } catch {
-        return false;
-      }
-    });
-    if (matchedSession) {
-      return matchedSession.openingBalance;
-    }
-    const savedMutasiBal = localStorage.getItem('athree_mutasi_starting_balance');
-    return savedMutasiBal ? parseFloat(savedMutasiBal) : 500000;
-  }, [selectedMutationDate, activeSession, sessions]);
-
-  const todayInflow = React.useMemo(() => {
-    return todayTransactions
-      .filter(p => p.type !== 'PENGELUARAN')
-      .reduce((sum, p) => sum + p.amount, 0);
-  }, [todayTransactions]);
-
-  const todayOutflow = React.useMemo(() => {
-    return todayTransactions
-      .filter(p => p.type === 'PENGELUARAN')
-      .reduce((sum, p) => sum + p.amount, 0);
-  }, [todayTransactions]);
-
-  const todayNetFlow = todayInflow - todayOutflow;
-  const saldoHariIni = React.useMemo(() => {
-    return modalAwal + todayInflow - todayOutflow;
-  }, [modalAwal, todayInflow, todayOutflow]);
-
-  // Real-time Cash Flows from active session
-  const currentSessionPayments = activeSession
-    ? paymentTransactions.filter(p => new Date(p.timestamp).getTime() >= new Date(activeSession.openedAt).getTime())
-    : [];
-
-  const sessionCashIn = currentSessionPayments
-    .filter(p => p.type !== 'PENGELUARAN' && p.method === 'CASH')
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const sessionCashOut = currentSessionPayments
-    .filter(p => p.type === 'PENGELUARAN' && p.method === 'CASH')
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const sessionTransferIn = currentSessionPayments
-    .filter(p => p.type !== 'PENGELUARAN' && p.method === 'TRANSFER')
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const sessionTransferOut = currentSessionPayments
-    .filter(p => p.type === 'PENGELUARAN' && p.method === 'TRANSFER')
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const sessionExpectedCash = activeSession
-    ? activeSession.openingBalance + sessionCashIn - sessionCashOut
-    : 0;
-
   // Filtered Invoices for Primary Dashboard Metrics (Perbulan / ALL / YEAR / CUSTOM)
   const filteredDashboardInvoices = React.useMemo(() => {
     if (dashboardPeriod === 'ALL') return invoices;
@@ -731,459 +497,6 @@ export default function Dashboard({
   const totalSedangDiproses = antreanCount + desainCount + prosesCount;
   const totalSelesaiDanSiap = selesaiCount + siapAmbilCount + sudahDiambilCount;
   const completionPercentage = totalNotesCount > 0 ? Math.round((totalSelesaiDanSiap / totalNotesCount) * 100) : 0;
-
-  const renderMutasiKasHarian = (showHeader: boolean = true) => {
-    return (
-      <div className="space-y-6" id="mutasi-kas-harian-panel">
-        {showHeader && (
-          <div className="border-b border-indigo-150 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <span className="text-[10px] uppercase font-black tracking-widest text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">📋 FITUR TERINTEGRASI</span>
-              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mt-2 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-indigo-500" />
-                Buku Mutasi Kas Harian Toko
-              </h3>
-              <p className="text-xs text-slate-500 font-semibold mt-1">
-                Pantau real-time arus masuk &amp; pengeluaran operasional serta kelola mutasi kas harian secara lengkap
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Date Selector Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-3xl border border-indigo-50">
-          <div className="flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-indigo-505 text-indigo-600" />
-            <div>
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Tanggal Buku Mutasi</label>
-              <span className="text-sm font-bold text-slate-700">
-                {new Date(selectedMutationDate).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500">Pilih Tanggal:</span>
-            <input 
-              type="date"
-              value={selectedMutationDate}
-              onChange={(e) => setSelectedMutationDate(e.target.value)}
-              className="px-4 py-2 text-sm bg-white border-2 border-indigo-100 rounded-2xl text-slate-800 font-bold outline-none focus:border-indigo-500"
-            />
-          </div>
-        </div>
-
-        {/* Section Summary Row (Bento Grid 4 Cards) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {/* 1. Modal Awal */}
-          <div className="bg-white border-2 border-indigo-50 p-6 rounded-3xl shadow-sm flex items-center gap-4 relative">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100 flex-shrink-0">
-              <Coins className="w-6 h-6 stroke-[2.5]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Modal Awal Sesi</span>
-              {isEditingDashboardOpening ? (
-                <div className="mt-1 space-y-1">
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
-                    <input
-                      type="text"
-                      value={revisedDashboardOpening}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, '');
-                        if (val) {
-                          setRevisedDashboardOpening(parseInt(val, 10).toLocaleString('id-ID'));
-                        } else {
-                          setRevisedDashboardOpening('');
-                        }
-                      }}
-                      className="w-full pl-8 pr-2 py-1 text-xs font-mono font-bold text-slate-800 bg-slate-50 border border-indigo-200 rounded-lg outline-none focus:border-indigo-500"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => {
-                        const val = parseFloat(revisedDashboardOpening.replace(/[^0-9]/g, ''));
-                        if (!isNaN(val) && val >= 0) {
-                          onUpdateSessionOpeningBalance?.(val);
-                          setIsEditingDashboardOpening(false);
-                        }
-                      }}
-                      className="flex-1 py-0.5 px-1.5 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded transition flex items-center justify-center gap-0.5"
-                    >
-                      <Check className="w-2.5 h-2.5" /> Simpan
-                    </button>
-                    <button
-                      onClick={() => setIsEditingDashboardOpening(false)}
-                      className="py-0.5 px-1.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition flex items-center justify-center"
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-baseline justify-between mt-1">
-                  <span className="text-xl font-black text-slate-800 font-mono block truncate">{formatRp(modalAwal)}</span>
-                  {userRole === 'OWNER' && (
-                    <button
-                      onClick={() => {
-                        setRevisedDashboardOpening(modalAwal.toLocaleString('id-ID'));
-                        setIsEditingDashboardOpening(true);
-                      }}
-                      className="text-[10px] font-bold text-indigo-650 hover:underline flex items-center gap-0.5 ml-2 transition shrink-0"
-                    >
-                      <Edit className="w-3 h-3" /> Revisi
-                    </button>
-                  )}
-                </div>
-              )}
-              <span className="text-[10px] font-semibold text-slate-400">Saldo awal buka kasir</span>
-            </div>
-          </div>
-
-          {/* 2. Total Pemasukan */}
-          <div className="bg-white border-2 border-indigo-50 p-6 rounded-3xl shadow-sm flex items-center gap-4">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex-shrink-0">
-              <ArrowDownRight className="w-6 h-6 stroke-[2.5]" />
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Total Pemasukan</span>
-              <span className="text-xl font-black text-emerald-650 font-mono mt-1 block">+{formatRp(todayInflow)}</span>
-              <span className="text-[10px] font-semibold text-slate-400">Pemasukan &amp; Pelunasan</span>
-            </div>
-          </div>
-
-          {/* 3. Total Pengeluaran */}
-          <div className="bg-white border-2 border-indigo-50 p-6 rounded-3xl shadow-sm flex items-center gap-4">
-            <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100 flex-shrink-0">
-              <ArrowUpRight className="w-6 h-6 stroke-[2.5]" />
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Total Pengeluaran</span>
-              <span className="text-xl font-black text-rose-605 font-mono mt-1 block">-{formatRp(todayOutflow)}</span>
-              <span className="text-[10px] font-semibold text-slate-405">Kas keluar operasional</span>
-            </div>
-          </div>
-
-          {/* 4. Saldo Akhir Hari Ini */}
-          <div className="bg-gradient-to-br from-indigo-950 to-indigo-900 border-2 border-indigo-950 p-6 rounded-3xl shadow-md text-white flex items-center gap-4 relative overflow-hidden">
-            <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-white/5 rounded-full blur-xl pointer-events-none" />
-            <div className="p-3 bg-white/10 text-emerald-400 rounded-2xl border border-white/10 flex-shrink-0">
-              <Wallet className="w-6 h-6 stroke-[2.5]" />
-            </div>
-            <div className="relative z-10 w-full">
-              <span className="text-[10px] font-black uppercase text-indigo-300 tracking-wider block">Saldo Akhir Hari Ini</span>
-              <span className="text-xl font-black text-white font-mono mt-1 block">{formatRp(saldoHariIni)}</span>
-              <span className="text-[9px] font-bold text-emerald-300 block leading-tight mt-0.5">Modal + Masuk - Keluar</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick mutation form + Ledger container */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          
-          {/* Left part: Today's Ledger table (3 cols) */}
-          <div className="lg:col-span-3 bg-white border-2 border-indigo-50 relative overflow-hidden shadow-sm space-y-4 rounded-[2rem] p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-indigo-50/80 pb-4">
-              <div>
-                <h3 className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-indigo-500" />
-                  Buku Mutasi Hari Ini
-                </h3>
-                <p className="text-xs text-slate-400 font-semibold">
-                  Daftar seluruh pemasukan &amp; pengeluaran kas khusus hari ini
-                </p>
-              </div>
-
-              {/* Filter tabs */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 p-1 rounded-xl self-start sm:self-auto">
-                <button 
-                  type="button"
-                  onClick={() => setMutationFilter('SEMUA')}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition ${mutationFilter === 'SEMUA' ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-750'}`}
-                >
-                  Semua ({todayTransactions.length})
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setMutationFilter('MASUK')}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition ${mutationFilter === 'MASUK' ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-750'}`}
-                >
-                  Masuk
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setMutationFilter('KELUAR')}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition ${mutationFilter === 'KELUAR' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-750'}`}
-                >
-                  Keluar
-                </button>
-              </div>
-            </div>
-
-            {/* Transactions list */}
-            {(() => {
-              // Calculate rolling balance
-              const sortedTodayTx = [...todayTransactions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-              let currentBal = modalAwal;
-              
-              const mutationsWithBalance = sortedTodayTx.map((tx) => {
-                const isDebit = tx.type === 'PENGELUARAN';
-                const isTransfer = tx.method === 'TRANSFER';
-                
-                // Update rolling balance only for non-transfer transactions
-                if (!isTransfer) {
-                  if (isDebit) {
-                    currentBal -= tx.amount;
-                  } else {
-                    currentBal += tx.amount;
-                  }
-                }
-                
-                return {
-                  ...tx,
-                  isDebit,
-                  isTransfer,
-                  balance: currentBal
-                };
-              });
-
-              const filteredMutations = mutationsWithBalance.filter((mut) => {
-                if (mutationFilter === 'MASUK') return !mut.isDebit || mut.isTransfer;
-                if (mutationFilter === 'KELUAR') return mut.isDebit && !mut.isTransfer;
-                return true;
-              });
-
-              return (
-                <div className="overflow-x-auto select-text">
-                  <table className="w-full text-left border-collapse text-xs" id="dashboard-bank-ledger-replica-table">
-                    <thead>
-                      <tr className="bg-slate-50 border-b-2 border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                        <th className="px-3 py-2.5 w-16">WAKTU</th>
-                        <th className="px-3 py-2.5">KETERANGAN</th>
-                        <th className="px-3 py-2.5 text-right w-40">MUTASI (CR/DB)</th>
-                        <th className="px-3 py-2.5 text-right w-40">TOTAL SALDO</th>
-                        <th className="px-3 py-2.5 text-center w-12 print:hidden">AKSI</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {/* Initial Balance Row */}
-                      <tr className="bg-slate-50/50 border-b border-slate-100">
-                        <td className="px-3 py-2 font-mono text-[11px] font-bold text-slate-400">00:00</td>
-                        <td className="px-3 py-2 text-slate-400 italic uppercase font-semibold">SALDO AWAL SEBELUM TRANSAKSI</td>
-                        <td className="px-3 py-2 text-right text-slate-400">-</td>
-                        <td className="px-3 py-2 text-right font-mono text-[11px] font-bold text-slate-600">
-                          {formatRp(modalAwal)}
-                        </td>
-                        <td className="px-3 py-2 text-center print:hidden text-slate-400">-</td>
-                      </tr>
-
-                      {filteredMutations.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="px-3 py-8 text-center text-slate-400 italic font-semibold">
-                            Tidak ada mutasi kas harian yang cocok dengan filter ini.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredMutations.map((mut) => {
-                          const dateObj = new Date(mut.timestamp);
-                          const timeStr = isNaN(dateObj.getTime()) ? '--:--' : dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-                          
-                          // Format Description nicely
-                          let descText = mut.notes || (mut.isDebit ? 'Pengeluaran Manual' : 'Pemasukan');
-                          
-                          return (
-                            <tr key={mut.id} className="hover:bg-slate-50/50 transition-colors border-b border-slate-100/50">
-                              {/* WAKTU */}
-                              <td className="px-3 py-2.5 font-mono text-[11px] font-bold text-slate-500 align-top">
-                                {timeStr}
-                              </td>
-
-                              {/* Keterangan */}
-                              <td className="px-3 py-2.5 align-top">
-                                <div className="font-bold text-slate-800 leading-tight">
-                                  {descText}
-                                </div>
-                                {mut.customerName && (
-                                  <div className="text-[10px] font-semibold text-slate-500 mt-0.5">
-                                    Pelanggan/Sumber: <strong className="text-indigo-650">{mut.customerName}</strong>
-                                  </div>
-                                )}
-                                {mut.invoiceNum && (
-                                  <div className="text-[10px] font-semibold text-indigo-500 mt-0.5">
-                                    Nota Ref: {mut.invoiceNum}
-                                  </div>
-                                )}
-                                <div className="text-[9px] font-bold text-slate-400 mt-0.5 uppercase tracking-wide">
-                                  Oleh: {mut.cashier || 'Sistem'}
-                                </div>
-                              </td>
-
-                              {/* MUTASI (CR/DB) */}
-                              <td className={`px-3 py-2.5 text-right font-mono text-[11px] font-bold align-top ${
-                                (mut.isDebit && !mut.isTransfer) ? 'text-rose-650' : 'text-emerald-650'
-                              }`}>
-                                {(mut.isDebit && !mut.isTransfer) ? '-' : '+'}{mut.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {(!mut.isDebit || mut.isTransfer) ? 'CR' : 'DB'}
-                              </td>
-
-                              {/* TOTAL SALDO */}
-                              <td className="px-3 py-2.5 text-right font-mono text-[11px] font-bold align-top text-slate-700">
-                                {mut.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </td>
-
-                              {/* AKSI */}
-                              <td className="px-3 py-2.5 text-center align-top print:hidden">
-                                <div className="flex items-center justify-center gap-1">
-                                  {userRole === 'OWNER' ? (
-                                    <>
-                                      <button
-                                        onClick={() => handleStartEdit(mut)}
-                                        title="Edit Mutasi"
-                                        type="button"
-                                        className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition"
-                                      >
-                                        <Edit className="w-3 h-3" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteMutationClick(mut.id)}
-                                        title="Hapus"
-                                        type="button"
-                                        className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <span title="Hanya Owner" className="p-1 text-slate-300">
-                                      <Lock className="w-3.5 h-3.5" />
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Right part: Quick Entry Form (2 cols) */}
-          <div className="lg:col-span-2 bg-indigo-950 text-white rounded-[2rem] p-6 shadow-md relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full blur-2xl pointer-events-none" />
-            
-            <div className="relative z-10 space-y-4">
-              <div>
-                <h3 className="text-base font-black tracking-tight flex items-center gap-2">
-                  <span className="flex h-3 w-3 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                  </span>
-                  Catat Mutasi Kas Harian
-                </h3>
-                <p className="text-xs text-indigo-200/80 font-bold mt-1">
-                  Tambahkan dana masuk atau keluar manual di luar transaksi nota
-                </p>
-              </div>
-
-              <form onSubmit={handleAddMutation} className="space-y-4">
-                {/* Mutation type radio switcher */}
-                <div className="grid grid-cols-2 gap-2 p-1.5 bg-indigo-900 rounded-2xl border border-indigo-800">
-                  <button
-                    type="button"
-                    onClick={() => setMutationType('PEMASUKAN')}
-                    className={`py-2 text-center text-xs font-black uppercase rounded-xl transition ${mutationType === 'PEMASUKAN' ? 'bg-emerald-500 text-white shadow-md' : 'text-indigo-200 hover:text-white'}`}
-                  >
-                    Kas Masuk
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMutationType('PENGELUARAN')}
-                    className={`py-2 text-center text-xs font-black uppercase rounded-xl transition ${mutationType === 'PENGELUARAN' ? 'bg-rose-500 text-white shadow-md' : 'text-indigo-200 hover:text-white'}`}
-                  >
-                    Kas Keluar
-                  </button>
-                </div>
-
-                {/* Amount of money */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">Nominal Uang (RUPIAH)</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-indigo-300 font-mono">Rp</span>
-                    <input
-                      type="text"
-                      required
-                      placeholder="0"
-                      value={mutationAmount}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, '');
-                        if (val) {
-                          setMutationAmount(parseInt(val, 10).toLocaleString('id-ID'));
-                        } else {
-                          setMutationAmount('');
-                        }
-                      }}
-                      className="w-full bg-indigo-900 text-white pl-10 pr-4 py-3 rounded-2xl border border-indigo-800 text-sm font-black font-mono focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Method select */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">Metode Pembayaran</label>
-                  <select
-                    value={mutationMethod}
-                    onChange={(e) => setMutationMethod(e.target.value as 'CASH' | 'TRANSFER')}
-                    className="w-full bg-indigo-900 text-indigo-50 border border-indigo-800 px-3.5 py-3 rounded-2xl text-sm font-bold focus:border-indigo-400 focus:outline-none"
-                  >
-                    <option value="CASH">💵 TUNAI (CASH)</option>
-                    <option value="TRANSFER">🏦 TRANSFER BANK</option>
-                  </select>
-                </div>
-
-                {/* Keterangan */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">Keperluan / Keterangan</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Beli bensin kurir, beli lakban"
-                    value={mutationNotes}
-                    onChange={(e) => setMutationNotes(e.target.value)}
-                    className="w-full bg-indigo-900 text-white px-3.5 py-3 rounded-2xl border border-indigo-800 text-xs font-bold focus:border-indigo-400 focus:outline-none"
-                  />
-                </div>
-
-                {/* Client name (optional) */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">Sumber / Nama Pelanggan (Opsional)</label>
-                  <input
-                    type="text"
-                    placeholder="Nama pelanggan/pihak ketiga"
-                    value={mutationCustomer}
-                    onChange={(e) => setMutationCustomer(e.target.value.toUpperCase())}
-                    className="w-full bg-indigo-900 text-white px-3.5 py-3 rounded-2xl border border-indigo-800 text-xs font-bold focus:border-indigo-400 focus:outline-none uppercase"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmittingMutation}
-                  className={`w-full py-4 mt-2 font-black rounded-2xl text-xs uppercase tracking-wider transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${mutationType === 'PENGELUARAN' ? 'bg-rose-500 hover:bg-rose-600 shadow-md shadow-rose-950/40 text-white border-2 border-rose-400/40' : 'bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-950/40 text-white border-2 border-emerald-400/40'}`}
-                >
-                  {isSubmittingMutation ? 'Memproses...' : mutationType === 'PENGELUARAN' ? 'Catat Kas Keluar 📤' : 'Catat Kas Masuk 📥'}
-                </button>
-              </form>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    );
-  };
 
   // Urgent deadlines: Production status is NOT finished and deadlineDate is today or past due
   const urgentDeadlines = React.useMemo(() => {
@@ -1393,7 +706,7 @@ export default function Dashboard({
                 onClick={() => setActiveTab('nota-baru')}
                 className="flex items-center justify-center gap-2 px-5 py-4 bg-amber-400 hover:bg-amber-500 transition-all font-black rounded-2xl shadow-lg shadow-indigo-600/40 text-slate-900 border-none text-xs uppercase tracking-wider italic cursor-pointer whitespace-nowrap"
               >
-                Buat Nota Baru
+                Tambah Pekerjaan
                 <ArrowUpRight className="w-4 h-4" />
               </button>
             </div>
@@ -1478,13 +791,6 @@ export default function Dashboard({
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setActiveTab('stok-barang')}
-            className="w-full md:w-auto px-6 py-3.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black rounded-2xl text-xs border-none cursor-pointer transition shadow-sm uppercase tracking-wider flex items-center justify-center gap-1.5 self-center"
-          >
-            Selesaikan / Restock
-            <ArrowUpRight className="w-4 h-4" />
-          </button>
         </motion.div>
       )}
 
@@ -1543,447 +849,14 @@ export default function Dashboard({
         </motion.div>
       )}
 
-      {/* Real-time Casher Active Session Monitor */}
-      {activeSession && userRole === 'OWNER' ? (
-        <motion.div 
-          initial={{ opacity: 0, y: -5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-6 rounded-[2rem] bg-indigo-900 text-white shadow-xl relative overflow-hidden group print:hidden border-none"
-          id="cashier-realtime-monitor-card"
-        >
-          {/* Glow ambient decoration */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-125 transition duration-500" />
-          
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-355 border border-emerald-500/30">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                Sesi Kasir Aktif ({activeSession.openedBy})
-              </span>
-              <h3 className="text-xl font-black font-sans tracking-tight">
-                Monitor Laci Kas & Uang Fisik Terbuka
-              </h3>
-              <p className="text-xs text-indigo-200/90 font-semibold leading-relaxed max-w-2xl">
-                Memantau laci uang fisik secara real-time berdasarkan transaksi hari ini. Kasir wajib mencocokkan uang fisik di laci agar sesuai dengan nilai <strong className="text-emerald-300 underline">Estimasi Uang Fisik</strong> di bawah ini.
-              </p>
-            </div>
-            {userRole === 'OWNER' && (
-              <button
-                onClick={() => setActiveTab('kasir-closingan')}
-                className="self-start lg:self-auto px-5 py-3 bg-white hover:bg-indigo-50 text-indigo-950 font-extrabold rounded-2xl text-xs border-none cursor-pointer transition shadow-md uppercase tracking-wider flex items-center gap-1.5"
-              >
-                Selesaikan / Tutup Kasir
-                <ArrowUpRight className="w-4 h-4 text-indigo-950" />
-              </button>
-            )}
-          </div>
-
-          {/* 4-Item Sub-Grid statistics inside the card for visual balance */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-indigo-800/60">
-            {/* Modal Awal */}
-            <div className="bg-indigo-950/45 p-4 rounded-2xl border border-indigo-800/50">
-              <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block mb-1">💵 Modal Awal Tunai</span>
-              <div className="text-lg font-black font-mono text-indigo-100">
-                {formatRp(activeSession.openingBalance)}
-              </div>
-              <span className="text-[10px] text-indigo-400 font-medium mt-1 block">Kas laci saat buka sesi</span>
-            </div>
-
-            {/* Cash In (Uang Masuk) */}
-            <div className="bg-indigo-950/45 p-4 rounded-2xl border border-indigo-800/50">
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-1">📥 Kas Masuk (Cash In)</span>
-              <div className="text-lg font-black font-mono text-emerald-400 flex items-center gap-1">
-                + {formatRp(sessionCashIn)}
-              </div>
-              <span className="text-[10px] text-indigo-400 font-medium mt-1 block">Dari DP & pelunasan tunai</span>
-            </div>
-
-            {/* Cash Out (Uang Keluar) */}
-            <div className="bg-indigo-950/45 p-4 rounded-2xl border border-indigo-800/50">
-              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider block mb-1">📤 Kas Keluar (Cash Out)</span>
-              <div className="text-lg font-black font-mono text-rose-400 flex items-center gap-1">
-                - {formatRp(sessionCashOut)}
-              </div>
-              <span className="text-[10px] text-indigo-400 font-medium mt-1 block">Pengeluaran operasional tunai</span>
-            </div>
-
-            {/* Estimasi Fisik Laci */}
-            <div className="bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/25">
-              <span className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider block mb-1">💰 Estimasi Uang Fisik</span>
-              <div className="text-xl font-black font-mono text-emerald-300">
-                {formatRp(sessionExpectedCash)}
-              </div>
-              <span className="text-[10px] text-emerald-300/80 font-bold mt-1 block">Wajib Cocok di Sesi Kas laci</span>
-            </div>
-          </div>
-        </motion.div>
-      ) : null}
-
-      {/* Kartu Ringkasan Status Produksi / Volume Kerja Aktif */}
-      <motion.div 
-        initial={{ opacity: 0, y: -5 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-6 rounded-[2rem] bg-white border-2 border-indigo-50 shadow-sm print:hidden"
-        id="production-status-summary-card"
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 pb-4 border-b border-indigo-50/50">
-          <div className="space-y-1">
-            <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-              🛠️ Volume Kerja &amp; Status Produksi Aktif
-            </h4>
-            <p className="text-xs text-slate-400 font-semibold leading-relaxed">
-              Pantau langsung jumlah nota yang sedang diproses vs yang sudah selesai untuk mengelola kapasitas tim kerja.
-            </p>
-          </div>
-          <span className="text-xs font-mono font-extrabold text-indigo-600 bg-indigo-50 dark:bg-slate-800 py-1.5 px-3.5 rounded-full select-none">
-            {totalNotesCount} Total Nota Transaksi
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          {/* Ongoing Work: Columns 5 */}
-          <div className="md:col-span-5 space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-black text-rose-500 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse" />
-                ⚙️ Sedang Diproses (Active Work)
-              </span>
-              <span className="text-2xl font-black text-slate-800 font-mono">
-                {totalSedangDiproses} <span className="text-xs font-medium text-slate-400">Nota</span>
-              </span>
-            </div>
-            
-            {/* Subsection progress for Antrean, Desain, Proses */}
-            <div className="grid grid-cols-3 gap-2.5 text-center">
-              <div className="bg-slate-50 dark:bg-slate-850 p-2.5 rounded-2xl border border-indigo-50/30">
-                <span className="text-[10px] font-bold text-slate-400 block mb-1">⏳ ANTREAN</span>
-                <span className="text-lg font-black text-slate-700 font-mono">{antreanCount}</span>
-              </div>
-              <div className="bg-indigo-50/15 dark:bg-slate-850 p-2.5 rounded-2xl border border-indigo-55/30">
-                <span className="text-[10px] font-bold text-indigo-500 block mb-1">🎨 DESAIN</span>
-                <span className="text-lg font-black text-indigo-700 font-mono">{desainCount}</span>
-              </div>
-              <div className="bg-amber-50/15 dark:bg-slate-850 p-2.5 rounded-2xl border border-amber-50/30">
-                <span className="text-[10px] font-bold text-amber-500 block mb-1">⚙️ PROSES</span>
-                <span className="text-lg font-black text-amber-650 font-mono">{prosesCount}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress bar visualizer: Columns 2 */}
-          <div className="md:col-span-2 flex flex-col justify-center items-center py-4 md:py-0 border-y md:border-y-0 md:border-x border-indigo-50/50">
-            <div className="text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Rasio Selesai</span>
-              <div className="text-3xl font-black text-emerald-650 font-mono leading-none">{completionPercentage}%</div>
-              
-              <div className="w-28 bg-slate-100 rounded-full h-2 mt-2.5 mx-auto relative overflow-hidden">
-                <div 
-                  className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${completionPercentage}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Completed Work: Columns 5 */}
-          <div className="md:col-span-5 space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-black text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
-                <Check className="w-4 h-4 text-emerald-500 stroke-[3]" />
-                ✅ Selesai (Completed / Ready)
-              </span>
-              <span className="text-2xl font-black text-slate-800 font-mono">
-                {totalSelesaiDanSiap} <span className="text-xs font-medium text-slate-400">Nota</span>
-              </span>
-            </div>
-
-            {/* Subsection progress for Selesai, Siap Diambil */}
-            <div className="grid grid-cols-2 gap-2.5 text-center">
-              <div className="bg-emerald-50/15 dark:bg-slate-850 p-2.5 rounded-2xl border border-emerald-50/30">
-                <span className="text-[10px] font-bold text-emerald-650 block mb-1">✅ SELESAI</span>
-                <span className="text-lg font-black text-emerald-700 font-mono">{selesaiCount}</span>
-              </div>
-              <div className="bg-blue-50/15 dark:bg-slate-850 p-2.5 rounded-2xl border border-blue-50/30">
-                <span className="text-[10px] font-bold text-blue-600 block mb-1">📦 SIAP DIAMBIL</span>
-                <span className="text-lg font-black text-blue-700 font-mono">{siapAmbilCount}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Work Volume Interactive Recommendation Action details */}
-        <div className="mt-5 pt-4 border-t border-indigo-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/40 p-3.5 rounded-2xl">
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <Activity className="w-4 h-4 text-indigo-500 stroke-[2.5]" />
-            <span>
-              {totalSedangDiproses > 5 ? (
-                <span>⚠️ Kapasitas produksi sedang padat (<strong className="text-rose-600">{totalSedangDiproses} pekerjaan aktif</strong>). Atur jadwal kerja lembur atau prioritas deadline hari ini.</span>
-              ) : totalSedangDiproses > 0 ? (
-                <span>👍 Volume kerja moderat ({totalSedangDiproses} aktif). Fokus menyelesaikan antrean saat ini sebelum menerima order mendesak baru.</span>
-              ) : (
-                <span>✨ Semua pesanan telah diselesaikan! Siap menerima volume order baru secara optimal.</span>
-              )}
-            </span>
-          </div>
-          <button
-            onClick={() => setActiveTab('daftar-nota')}
-            className="w-full sm:w-auto px-4.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black rounded-xl text-xs cursor-pointer select-none transition border-none flex items-center gap-1 self-end sm:self-auto justify-center"
-          >
-            Atur Prioritas Sifat Produksi
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </motion.div>
-
-      {/* Mutasi Kas Harian Panel (Special screen for KASIR role, now simplified using helper) */}
-      {userRole === 'KASIR' ? (
-        renderMutasiKasHarian(false)
-      ) : (
-        <div className="space-y-6 print:hidden">
-          {/* Period Filter Selector for Metrics */}
-          <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                <Calendar className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Filter Periode Ringkasan:</span>
-                <span className="text-xs font-black text-indigo-700">
-                  {getPeriodLabel()}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setDashboardPeriod('MONTH')}
-                className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
-                  dashboardPeriod === 'MONTH'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                📅 Bulan Ini
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDashboardPeriod('CUSTOM')}
-                className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
-                  dashboardPeriod === 'CUSTOM'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                🗓️ Pilih Bulan
-              </button>
-
-              {dashboardPeriod === 'CUSTOM' && (
-                <input
-                  type="month"
-                  value={selectedMonthYear}
-                  onChange={(e) => setSelectedMonthYear(e.target.value)}
-                  className="px-2.5 py-1 text-xs font-bold border-2 border-indigo-200 rounded-xl bg-white text-slate-800 outline-none focus:border-indigo-600 cursor-pointer"
-                />
-              )}
-
-              <button
-                type="button"
-                onClick={() => setDashboardPeriod('YEAR')}
-                className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
-                  dashboardPeriod === 'YEAR'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                📆 Tahun Ini
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDashboardPeriod('ALL')}
-                className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
-                  dashboardPeriod === 'ALL'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                🌐 Semua Waktu
-              </button>
-            </div>
-          </div>
-
-          {/* Primary Statistics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="stats-grid">
-            
-            {/* Total Omset */}
-            <motion.div 
-              className="p-6 rounded-3xl bg-white border-2 border-indigo-50 flex items-start gap-4 shadow-sm"
-              whileHover={{ y: -2 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="p-3.5 bg-green-50 text-green-600 rounded-2xl border border-green-100">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL PENJUALAN (OMSET)</p>
-                  <span className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                    {dashboardPeriod === 'MONTH' ? 'BULANAN' : dashboardPeriod === 'CUSTOM' ? 'OPSI BULAN' : dashboardPeriod === 'YEAR' ? 'TAHUNAN' : 'SEMUA'}
-                  </span>
-                </div>
-                <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-1">
-                  {userRole !== 'OWNER' ? (
-                    <span className="text-sm font-black text-slate-400 bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-1">🔒 Akses Owner</span>
-                  ) : (
-                    formatRp(totalRevenue)
-                  )}
-                </h3>
-                <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1 mt-1">
-                  Dari <span className="font-bold text-indigo-600">{filteredDashboardInvoices.length}</span> nota pemesanan
-                </span>
-              </div>
-            </motion.div>
-
-            {/* Total Kas Masuk */}
-            <motion.div 
-              className="p-6 rounded-3xl bg-white border-2 border-indigo-50 flex items-start gap-4 shadow-sm"
-              whileHover={{ y: -2 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
-                <Wallet className="w-6 h-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL KAS MASUK</p>
-                  <span className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                    {dashboardPeriod === 'MONTH' ? 'BULANAN' : dashboardPeriod === 'CUSTOM' ? 'OPSI BULAN' : dashboardPeriod === 'YEAR' ? 'TAHUNAN' : 'SEMUA'}
-                  </span>
-                </div>
-                <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-1">
-                  {userRole !== 'OWNER' ? (
-                    <span className="text-sm font-black text-slate-400 bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-1">🔒 Akses Owner</span>
-                  ) : (
-                    formatRp(totalCashReceived)
-                  )}
-                </h3>
-                <div className="w-full bg-indigo-50 rounded-full h-1.5 mt-2">
-                  <div 
-                    className="bg-indigo-500 h-1.5 rounded-full" 
-                    style={{ width: `${userRole === 'OWNER' && totalRevenue > 0 ? (totalCashReceived / totalRevenue) * 100 : 0}%` }}
-                  />
-                </div>
-                <span className="text-[11px] text-slate-500 font-medium flex justify-between mt-1">
-                  <span>Efektivitas Pelunasan</span>
-                  <span className="font-bold text-indigo-600">
-                    {userRole !== 'OWNER' ? '🔒' : `${totalRevenue > 0 ? Math.round((totalCashReceived / totalRevenue) * 100) : 0}%`}
-                  </span>
-                </span>
-              </div>
-            </motion.div>
-
-            {/* Sisa Piutang */}
-            <motion.div 
-              className={`p-6 rounded-3xl flex items-start gap-4 transition-all duration-300 cursor-pointer ${
-                userRole === 'OWNER' && totalReceivables > 0 
-                  ? 'bg-[#FF6B6B] text-white shadow-lg border-none' 
-                  : 'bg-white border-2 border-indigo-50 text-slate-700 shadow-sm'
-              }`}
-              whileHover={{ y: -2 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setActiveTab('daftar-nota')}
-            >
-              <div className={`p-3.5 rounded-2xl ${
-                userRole === 'OWNER' && totalReceivables > 0
-                  ? 'bg-white/20 text-white border border-white/30'
-                  : 'bg-amber-50 text-amber-600 rounded-2xl border border-amber-100'
-              }`}>
-                <Landmark className="w-6 h-6 animate-pulse" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                  <p className={`text-xs font-bold uppercase tracking-wider ${userRole === 'OWNER' && totalReceivables > 0 ? 'text-white/85' : 'text-slate-400'}`}>Total Piutang Usaha</p>
-                  {userRole === 'OWNER' && overdueInvoices.length > 0 && (
-                    <span className="animate-pulse bg-white text-rose-600 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-md border border-rose-100 flex items-center gap-0.5">
-                      ⏱️ {overdueInvoices.length} Jatuh Tempo
-                    </span>
-                  )}
-                </div>
-                <h3 className={`text-2xl font-black tracking-tight mt-1 ${userRole === 'OWNER' && totalReceivables > 0 ? 'text-white' : 'text-slate-800'}`}>
-                  {userRole !== 'OWNER' ? (
-                    <span className="text-sm font-black text-slate-400 bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-1">🔒 Akses Owner</span>
-                  ) : (
-                    formatRp(totalReceivables)
-                  )}
-                </h3>
-                <span className={`text-[11px] font-bold flex items-center gap-1 mt-1 ${userRole === 'OWNER' && totalReceivables > 0 ? 'text-white/90' : 'text-slate-400'}`}>
-                  ● {userRole !== 'OWNER' ? 'Hak akses terbatas (Khusus Owner)' : overdueInvoices.length > 0 ? `${overdueInvoices.length} nota jatuh tempo (>14 hari)!` : totalReceivables > 0 ? 'Ada tagihan aktif belum lunas' : 'Seluruh piutang lunas'}
-                </span>
-              </div>
-            </motion.div>
-
-            {/* Peringatan Deadline Produksi */}
-            <motion.div 
-              className={`p-6 rounded-3xl flex items-start gap-4 transition-all duration-300 cursor-pointer ${
-                urgentDeadlines.length > 0 
-                  ? 'bg-rose-600 text-white shadow-lg border-none' 
-                  : 'bg-white border-2 border-indigo-50 text-slate-700 shadow-sm'
-              }`}
-              whileHover={{ y: -2 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setActiveTab('daftar-nota')}
-            >
-              <div className={`p-3.5 rounded-2xl ${
-                urgentDeadlines.length > 0
-                  ? 'bg-white/20 text-white border border-white/30'
-                  : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
-              }`}>
-                <Clock className="w-6 h-6 stroke-[2]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                   <p className={`text-xs font-bold uppercase tracking-wider ${urgentDeadlines.length > 0 ? 'text-white/85' : 'text-slate-400'}`}>Deadline Jatuh Tempo</p>
-                   {urgentDeadlines.length > 0 && (
-                     <span className="animate-pulse bg-white text-rose-600 text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">
-                       🚨 URGENT
-                     </span>
-                   )}
-                </div>
-                <h3 className={`text-2xl font-black tracking-tight mt-1 ${urgentDeadlines.length > 0 ? 'text-white' : 'text-slate-800'}`}>
-                  {urgentDeadlines.length} <span className={`text-xs font-semibold ${urgentDeadlines.length > 0 ? 'text-white/80' : 'text-slate-404'}`}>Pekerjaan</span>
-                </h3>
-                <span className={`text-[11px] font-bold flex items-center gap-1 mt-1 ${urgentDeadlines.length > 0 ? 'text-white/95' : 'text-slate-400'}`}>
-                  {urgentDeadlines.length > 0 ? (
-                    <span>Segera proses &amp; selesaikan!</span>
-                  ) : (
-                    <span>Semua deadline produksi aman</span>
-                  )}
-                </span>
-              </div>
-            </motion.div>
-
-          </div>
-
-          {/* Buku Mutasi Kas Harian (RENDERED FOR OWNER) */}
-          {userRole === 'OWNER' && (
-            <div className="bg-slate-50/40 border-2 border-indigo-100/50 rounded-[2.5rem] p-6 shadow-sm">
-              {renderMutasiKasHarian(true)}
-            </div>
-          )}
-
-        </div>
-      )}
-
-      {/* Two Columns Dashboard Content */}
+      {/* Two Columns Dashboard Content: Daftar Proses Produksi & Tenggat Batas */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 print:hidden">
         
         {/* Left Column: Recent Notes (3 columns wide) - Hidden for PRODUKSI */}
         {userRole !== 'PRODUKSI' && (
           <div className="lg:col-span-3 space-y-4" id="recent-notes-column">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Daftar Nota Penjualan Terbaru</h2>
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Daftar Proses Produksi</h2>
               <button 
                 id="view-all-notes"
                 onClick={() => setActiveTab('daftar-nota')}
@@ -2315,7 +1188,123 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* Laporan Kinerja Penjualan Per Sales (RENDERED FOR OWNER) */}
+      {/* Kartu Ringkasan Status Produksi / Volume Kerja Aktif */}
+      <motion.div 
+        initial={{ opacity: 0, y: -5 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="p-6 rounded-[2rem] bg-white border-2 border-indigo-50 shadow-sm print:hidden"
+        id="production-status-summary-card"
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 pb-4 border-b border-indigo-50/50">
+          <div className="space-y-1">
+            <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+              🛠️ Volume Kerja &amp; Status Produksi Aktif
+            </h4>
+            <p className="text-xs text-slate-400 font-semibold leading-relaxed">
+              Pantau langsung jumlah nota yang sedang diproses vs yang sudah selesai untuk mengelola kapasitas tim kerja.
+            </p>
+          </div>
+          <span className="text-xs font-mono font-extrabold text-indigo-600 bg-indigo-50 dark:bg-slate-800 py-1.5 px-3.5 rounded-full select-none">
+            {totalNotesCount} Total Nota Transaksi
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          {/* Ongoing Work: Columns 5 */}
+          <div className="md:col-span-5 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-black text-rose-500 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse" />
+                ⚙️ Sedang Diproses (Active Work)
+              </span>
+              <span className="text-2xl font-black text-slate-800 font-mono">
+                {totalSedangDiproses} <span className="text-xs font-medium text-slate-400">Nota</span>
+              </span>
+            </div>
+            
+            {/* Subsection progress for Antrean, Desain, Proses */}
+            <div className="grid grid-cols-3 gap-2.5 text-center">
+              <div className="bg-slate-50 dark:bg-slate-850 p-2.5 rounded-2xl border border-indigo-50/30">
+                <span className="text-[10px] font-bold text-slate-400 block mb-1">⏳ ANTREAN</span>
+                <span className="text-lg font-black text-slate-700 font-mono">{antreanCount}</span>
+              </div>
+              <div className="bg-indigo-50/15 dark:bg-slate-850 p-2.5 rounded-2xl border border-indigo-55/30">
+                <span className="text-[10px] font-bold text-indigo-500 block mb-1">🎨 DESAIN</span>
+                <span className="text-lg font-black text-indigo-700 font-mono">{desainCount}</span>
+              </div>
+              <div className="bg-amber-50/15 dark:bg-slate-850 p-2.5 rounded-2xl border border-amber-50/30">
+                <span className="text-[10px] font-bold text-amber-500 block mb-1">⚙️ PROSES</span>
+                <span className="text-lg font-black text-amber-650 font-mono">{prosesCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress bar visualizer: Columns 2 */}
+          <div className="md:col-span-2 flex flex-col justify-center items-center py-4 md:py-0 border-y md:border-y-0 md:border-x border-indigo-50/50">
+            <div className="text-center">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Rasio Selesai</span>
+              <div className="text-3xl font-black text-emerald-650 font-mono leading-none">{completionPercentage}%</div>
+              
+              <div className="w-28 bg-slate-100 rounded-full h-2 mt-2.5 mx-auto relative overflow-hidden">
+                <div 
+                  className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${completionPercentage}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Completed Work: Columns 5 */}
+          <div className="md:col-span-5 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-black text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
+                <Check className="w-4 h-4 text-emerald-500 stroke-[3]" />
+                ✅ Selesai (Completed / Ready)
+              </span>
+              <span className="text-2xl font-black text-slate-800 font-mono">
+                {totalSelesaiDanSiap} <span className="text-xs font-medium text-slate-400">Nota</span>
+              </span>
+            </div>
+
+            {/* Subsection progress for Selesai, Siap Diambil */}
+            <div className="grid grid-cols-2 gap-2.5 text-center">
+              <div className="bg-emerald-50/15 dark:bg-slate-850 p-2.5 rounded-2xl border border-emerald-50/30">
+                <span className="text-[10px] font-bold text-emerald-650 block mb-1">✅ SELESAI</span>
+                <span className="text-lg font-black text-emerald-700 font-mono">{selesaiCount}</span>
+              </div>
+              <div className="bg-blue-50/15 dark:bg-slate-850 p-2.5 rounded-2xl border border-blue-50/30">
+                <span className="text-[10px] font-bold text-blue-600 block mb-1">📦 SIAP DIAMBIL</span>
+                <span className="text-lg font-black text-blue-700 font-mono">{siapAmbilCount}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Work Volume Interactive Recommendation Action details */}
+        <div className="mt-5 pt-4 border-t border-indigo-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/40 p-3.5 rounded-2xl">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <Activity className="w-4 h-4 text-indigo-500 stroke-[2.5]" />
+            <span>
+              {totalSedangDiproses > 5 ? (
+                <span>⚠️ Kapasitas produksi sedang padat (<strong className="text-rose-600">{totalSedangDiproses} pekerjaan aktif</strong>). Atur jadwal kerja lembur atau prioritas deadline hari ini.</span>
+              ) : totalSedangDiproses > 0 ? (
+                <span>👍 Volume kerja moderat ({totalSedangDiproses} aktif). Fokus menyelesaikan antrean saat ini sebelum menerima order mendesak baru.</span>
+              ) : (
+                <span>✨ Semua pesanan telah diselesaikan! Siap menerima volume order baru secara optimal.</span>
+              )}
+            </span>
+          </div>
+          <button
+            onClick={() => setActiveTab('daftar-nota')}
+            className="w-full sm:w-auto px-4.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black rounded-xl text-xs cursor-pointer select-none transition border-none flex items-center gap-1 self-end sm:self-auto justify-center"
+          >
+            Atur Prioritas Sifat Produksi
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Laporan Kinerja Penjualan Per Sales (RENDERED FOR OWNER) - Posisi Paling Bawah */}
       {userRole === 'OWNER' && (
         <div className="bg-white border-2 border-indigo-100 rounded-[2.5rem] p-6 shadow-md relative overflow-hidden print:hidden mt-6" id="sales-performance-card">
           {/* Card Header */}
@@ -2510,7 +1499,7 @@ export default function Dashboard({
                         </button>
                       </div>
 
-                      <div className="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-750 rounded-2xl overflow-hidden shadow-xs">
+                      <div className="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-755 rounded-2xl overflow-hidden shadow-xs">
                         <div className="overflow-x-auto font-sans">
                           <table className="w-full text-left border-collapse text-xs">
                             <thead>
@@ -3049,155 +2038,6 @@ export default function Dashboard({
                 )}
               </button>
             </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* --- HIGH-FIDELITY EDIT TRANSACTION DIALOG --- */}
-      {editingTransaction && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[60] overflow-y-auto animate-fade-in print:hidden" id="edit-transaction-modal">
-          <div className="bg-white border-2 border-indigo-100 rounded-3xl w-full max-w-md shadow-2xl relative overflow-hidden text-slate-800 font-sans">
-            
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-indigo-100 bg-indigo-50/50 flex justify-between items-center">
-              <div>
-                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                  <Edit className="w-4 h-4 text-indigo-600" />
-                  Mengubah Mutasi Kas Toko
-                </h3>
-                <p className="text-[10px] text-slate-505 font-bold mt-0.5">Ubah rincian mutasi kas masuk/keluar harian</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingTransaction(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-sm bg-transparent border-none cursor-pointer outline-none"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
-              
-              {/* Type info */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Tipe Mutasi</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditType('DP')}
-                    className={`py-2 px-3 text-center text-xs font-black uppercase rounded-xl transition ${editType === 'DP' ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  >
-                    Uang Muka (DP)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditType('PELUNASAN')}
-                    className={`py-2 px-3 text-center text-xs font-black uppercase rounded-xl transition ${editType === 'PELUNASAN' ? 'bg-teal-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  >
-                    Pelunasan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditType('PENGELUARAN')}
-                    className={`py-2 px-3 text-center text-xs font-black uppercase rounded-xl transition ${editType === 'PENGELUARAN' ? 'bg-rose-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  >
-                    Pengeluaran
-                  </button>
-                </div>
-              </div>
-
-              {/* Amount of money */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Nominal (Rupiah)</label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 font-mono">Rp</span>
-                  <input
-                    type="text"
-                    required
-                    placeholder="0"
-                    value={editAmount}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/[^0-9]/g, '');
-                      if (val) {
-                        setEditAmount(parseInt(val, 10).toLocaleString('id-ID'));
-                      } else {
-                        setEditAmount('');
-                      }
-                    }}
-                    className="w-full bg-slate-50 text-slate-800 pl-10 pr-4 py-3 rounded-2xl border border-slate-200 text-sm font-black font-mono focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                  />
-                </div>
-              </div>
-
-              {/* Method select */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Metode Pembayaran</label>
-                <select
-                  value={editMethod}
-                  onChange={(e) => setEditMethod(e.target.value as 'CASH' | 'TRANSFER')}
-                  className="w-full bg-slate-50 text-slate-800 border border-slate-200 px-3.5 py-3 rounded-2xl text-sm font-bold focus:border-indigo-400 focus:outline-none"
-                >
-                  <option value="CASH">💵 TUNAI (CASH)</option>
-                  <option value="TRANSFER">🏦 TRANSFER BANK</option>
-                </select>
-              </div>
-
-              {/* Keterangan */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Keterangan / Keperluan</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Keterangan transaksi"
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
-                />
-              </div>
-
-              {/* Client name (optional) */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Nama Pelanggan (Opsional)</label>
-                <input
-                  type="text"
-                  placeholder="Nama pelanggan/rekanan"
-                  value={editCustomer}
-                  onChange={(e) => setEditCustomer(e.target.value.toUpperCase())}
-                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none uppercase"
-                />
-              </div>
-
-              {/* Timestamp info */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Waktu Transaksi</label>
-                <input
-                  type="datetime-local"
-                  value={editTimestamp ? new Date(editTimestamp).toISOString().slice(0, 16) : ''}
-                  onChange={(e) => setEditTimestamp(new Date(e.target.value).toISOString())}
-                  className="w-full bg-slate-50 text-slate-800 px-3.5 py-3 rounded-2xl border border-slate-200 text-xs font-bold focus:border-indigo-400 focus:outline-none"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-end gap-2 pt-2 border-t border-indigo-50">
-                <button
-                  type="button"
-                  onClick={() => setEditingTransaction(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition active:scale-95 border-none"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingEdit}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-extrabold rounded-xl text-xs cursor-pointer transition active:scale-95 border-none shadow-md shadow-indigo-600/10"
-                >
-                  {isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
-                </button>
-              </div>
-
-            </form>
 
           </div>
         </div>

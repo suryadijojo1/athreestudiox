@@ -1782,7 +1782,7 @@ export default function PengaturanToko({
               </h5>
               <ol className="text-[10px] text-indigo-700/90 list-decimal list-inside space-y-1 font-bold leading-normal">
                 <li>Atur logo toko sesuka Anda di halaman ini</li>
-                <li>Pilih tab <span className="text-indigo-900 font-extrabold cursor-pointer hover:underline" onClick={() => setActiveTab?.('daftar-nota')}>'Daftar Nota Pembayaran'</span></li>
+                <li>Pilih tab <span className="text-indigo-900 font-extrabold cursor-pointer hover:underline" onClick={() => setActiveTab?.('daftar-nota')}>'Daftar Proses Produksi'</span></li>
                 <li>Klik tombol cetak atau lihat nota pada salah satu baris</li>
                 <li>Klik tombol <span className="text-indigo-900 font-extrabold">'Cetak Nota atau Pilih Printer'</span> di bagian bawah</li>
                 <li>Kop surat di lembaran cetak akan otomatis terpasang dengan logo baru Anda!</li>

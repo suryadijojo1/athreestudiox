@@ -1,4 +1,5 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
 import { 
   getFirestore, 
   collection, 
@@ -10,19 +11,11 @@ import {
   disableNetwork
 } from 'firebase/firestore';
 import { Product, Invoice, StockMovement, AuditLog, PaymentTransaction, CashierSession, SalesAgent, ShopSettings } from '../types';
+import firebaseConfig from '../../firebase-applet-config.json';
 
-// Load direct config from firebase-applet-config.json credentials
-const firebaseConfig = {
-  apiKey: "AIzaSyCFuQGgAfdmUmZNEqq6bVTSzgbRIymcL8M",
-  authDomain: "excellent-bit-csjh2.firebaseapp.com",
-  projectId: "excellent-bit-csjh2",
-  storageBucket: "excellent-bit-csjh2.firebasestorage.app",
-  messagingSenderId: "988360825147",
-  appId: "1:988360825147:web:42a597812576c793bd3f1e"
-};
-
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, "ai-studio-945047af-229e-4c44-9dd5-a88cc1aef953");
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const auth = getAuth(app);
 
 // Quota & Offline Status Tracking
 export let isQuotaExceeded = typeof localStorage !== 'undefined' && localStorage.getItem('athree_firestore_quota_exceeded') === 'true';

@@ -384,7 +384,7 @@ export default function NotaList({ invoices, onSelectInvoice, onPaySettlement, o
         <div>
           <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
             <Receipt className="w-6 h-6 text-indigo-500" />
-            Daftar Nota Pembayaran
+            Daftar Proses Produksi
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Cari nota, kelola sisa piutang, pelunasan pembayaran bertahap, dan cetak slip kasir untuk pelanggan.

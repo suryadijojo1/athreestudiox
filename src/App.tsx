@@ -2536,17 +2536,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Clear Cache Button */}
-              <button
-                type="button"
-                id="btn-header-clear-cache"
-                onClick={() => setIsClearCacheModalOpen(true)}
-                className="p-2 rounded-xl bg-white hover:bg-amber-50 border border-slate-250/90 text-slate-600 hover:text-amber-600 transition duration-150 cursor-pointer shadow-3xs flex items-center justify-center dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:text-amber-400"
-                title="Menu Hapus Cache & Performa Browser"
-              >
-                <Trash2 className="w-4 h-4 shrink-0 text-amber-500" />
-              </button>
-
               {/* Theme Toggle (Light / Dark Modo) */}
               <button
                 type="button"
@@ -2639,7 +2628,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* Tulis Nota Baru */}
+              {/* Tambah Pekerjaan */}
               {userRole !== 'PRODUKSI' && (
                 <button
                   id="tab-new-invoice"
@@ -2654,7 +2643,7 @@ export default function App() {
                   }`}
                 >
                   <ShoppingCart className="w-4 h-4" />
-                  Tulis Nota Baru
+                  Tambah Pekerjaan
                 </button>
               )}
 
@@ -2669,77 +2658,8 @@ export default function App() {
                 }`}
               >
                 <Receipt className="w-4 h-4" />
-                {userRole === 'PRODUKSI' ? 'Daftar Pekerjaan Produksi' : 'Daftar Nota Pembayaran'}
+                Daftar Proses Produksi
               </button>
-
-              {/* Rekap Kasir, Mutasi & Closing Kas */}
-              {userRole !== 'PRODUKSI' && (
-                <button
-                  id="tab-cash-drawer"
-                  onClick={() => setActiveTab('kasir-closingan')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
-                    activeTab === 'kasir-closingan' || activeTab === 'buku-mutasi'
-                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-100'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-indigo-50/60'
-                  }`}
-                >
-                  <div className="relative">
-                    <CreditCard className="w-4 h-4" />
-                    {activeSession && (
-                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    )}
-                  </div>
-                  Kasir, Mutasi & Closing Kas
-                </button>
-              )}
-
-              {/* Master Persediaan Stok */}
-              {userRole !== 'PRODUKSI' && (
-                <button
-                  id="tab-stock-catalog"
-                  onClick={() => setActiveTab('stok-barang')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
-                    activeTab === 'stok-barang'
-                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-100'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-indigo-50/60'
-                  }`}
-                >
-                  <Boxes className="w-4 h-4" />
-                  Urus Stok Barang
-                </button>
-              )}
-
-              {/* Laporan Mutasi Stok Otomatis */}
-              {userRole !== 'PRODUKSI' && (
-                <button
-                  id="tab-ledger-logs"
-                  onClick={() => setActiveTab('laporan-stok')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
-                    activeTab === 'laporan-stok'
-                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-100'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-indigo-50/60'
-                  }`}
-                >
-                  <BarChart3 className="w-4 h-4" />
-                  Log Mutasi Stok
-                </button>
-              )}
-
-              {/* Histori Aktivitas Audit Log */}
-              {userRole !== 'PRODUKSI' && (
-                <button
-                  id="tab-audit-logs"
-                  onClick={() => setActiveTab('histori-aktivitas')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-205 ${
-                    activeTab === 'histori-aktivitas'
-                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-100'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-indigo-50/60'
-                  }`}
-                >
-                  <History className="w-4 h-4" />
-                  Histori Aktivitas
-                </button>
-              )}
 
               {/* Pengaturan Logo Toko */}
               {userRole !== 'PRODUKSI' && (
@@ -2759,33 +2679,6 @@ export default function App() {
 
             </nav>
           </div>
-
-          {/* Quick Settings Action: Reset database & Playground controls */}
-          {userRole === 'OWNER' && (
-            <div className="p-4 border-t border-indigo-100 space-y-2 bg-indigo-50/10">
-              <button
-                id="sidebar-btn-clear-cache"
-                onClick={() => setIsClearCacheModalOpen(true)}
-                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-amber-700 rounded-xl text-xs font-bold transition duration-155 cursor-pointer shadow-3xs"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-amber-500" />
-                Menu Hapus Cache
-              </button>
-
-              <button
-                id="sidebar-btn-seed-simulation"
-                onClick={handleResetToPresets}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 border rounded-xl text-xs font-bold transition duration-155 bg-slate-50 hover:bg-rose-50 hover:text-rose-600 border-slate-200 hover:border-rose-100 text-slate-600 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Reset ke Data Simulasi
-              </button>
-              <div className="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1">
-                <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
-                Data tersimpan otomatis di browser
-              </div>
-            </div>
-          )}
         </aside>
 
         {/* Outer Workspace Shell Panel */}

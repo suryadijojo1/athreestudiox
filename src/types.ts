@@ -54,6 +54,7 @@ export interface InvoiceItem {
   qty: number;
   sellPrice: number;
   total: number;
+  designImage?: string; // Data URL / Base64 / URL of design or mockup
 }
 
 export interface Invoice {
@@ -77,6 +78,7 @@ export interface Invoice {
   paymentMethodDP?: 'CASH' | 'TRANSFER';
   paymentMethodSettlement?: 'CASH' | 'TRANSFER';
   salesCode?: string; // Kode Sales
+  designImage?: string; // Main design image or order mockup
 }
 
 export interface CashierSession {
